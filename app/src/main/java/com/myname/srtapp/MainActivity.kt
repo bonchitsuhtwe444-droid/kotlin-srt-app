@@ -10,24 +10,23 @@ import android.media.MediaMuxer
 import android.net.Uri
 import android.os.Bundle
 import android.text.InputType
+import android.util.Base64
 import android.view.Gravity
 import android.widget.Button
 import android.widget.EditText
+import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.activity.ComponentActivity
 import androidx.activity.result.contract.ActivityResultContracts
 import kotlinx.coroutines.*
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
-import okhttp3.MultipartBody
 import okhttp3.OkHttpClient
 import okhttp3.Request
-import okhttp3.RequestBody.Companion.asRequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
 import java.io.File
 import java.nio.ByteBuffer
-import java.util.Locale
 import java.util.concurrent.TimeUnit
 
 class MainActivity : ComponentActivity() {
@@ -64,9 +63,29 @@ class MainActivity : ComponentActivity() {
             setPadding(60, 80, 60, 80)
         }
 
+        // 📢 Logo အသစ် (အဝိုင်းပုံစံ Background ဖြင့်)
+        val logoContainer = FrameLayout(this).apply {
+            background = GradientDrawable().apply {
+                shape = GradientDrawable.OVAL
+                setColor(Color.parseColor("#1F2833"))
+                setStroke(5, Color.parseColor("#00c6ff"))
+            }
+            layoutParams = LinearLayout.LayoutParams(250, 250).apply {
+                gravity = Gravity.CENTER
+                bottomMargin = 30
+            }
+        }
+        val logoEmoji = TextView(this).apply {
+            text = "📢"
+            textSize = 55f
+            gravity = Gravity.CENTER
+            layoutParams = FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT)
+        }
+        logoContainer.addView(logoEmoji)
+
         val titleText = TextView(this).apply {
-            text = "📢 Auto SRT Gen\n✨ (Burmese AI Edition)"
-            textSize = 26f
+            text = "Auto SRT Gen\n✨ (Gemini AI Edition)"
+            textSize = 24f
             setTypeface(null, Typeface.BOLD)
             setTextColor(Color.parseColor("#E5E4E2"))
             gravity = Gravity.CENTER
@@ -75,7 +94,7 @@ class MainActivity : ComponentActivity() {
         }
 
         val apiKeyInput = EditText(this).apply {
-            hint = "🔑 Groq API Key ထည့်ပါ"
+            hint = "🔑 Gemini API Key ထည့်ပါ"
             setHintTextColor(Color.parseColor("#787878"))
             setTextColor(Color.WHITE)
             gravity = Gravity.CENTER
@@ -151,86 +170,72 @@ class MainActivity : ComponentActivity() {
                     }
 
                     withContext(Dispatchers.Main) {
-                        statusText.text = "🌐 ၂။ Whisper AI ဖြင့် အသံကို စာပြောင်းနေပါသည်..."
+                        statusText.text = "🌐 ၂။ Gemini ဖြင့် SRT နှင့် ဘာသာပြန်ခြင်းကို တပြိုင်နက် လုပ်ဆောင်နေပါသည်..."
                     }
+
+                    // Audio ဖိုင်ကို Base64 ပြောင်းခြင်း
+                    val bytes = audioFile.readBytes()
+                    val base64Audio = Base64.encodeToString(bytes, Base64.NO_WRAP)
 
                     val client = OkHttpClient.Builder()
                         .connectTimeout(120, TimeUnit.SECONDS)
                         .readTimeout(120, TimeUnit.SECONDS)
                         .build()
 
-                    val requestBody = MultipartBody.Builder()
-                        .setType(MultipartBody.FORM)
-                        .addFormDataPart("model", "whisper-large-v3")
-                        .addFormDataPart("response_format", "verbose_json")
-                        .addFormDataPart(
-                            "file", audioFile.name,
-                            audioFile.asRequestBody("audio/m4a".toMediaTypeOrNull())
-                        )
-                        .build()
+                    val jsonMediaType = "application/json; charset=utf-8".toMediaTypeOrNull()
+                    
+                    // Gemini 1.5 Flash သို့ တိုက်ရိုက်ပို့မည့် JSON
+                    val geminiJson = JSONObject().apply {
+                        put("contents", org.json.JSONArray().apply {
+                            put(JSONObject().apply {
+                                put("parts", org.json.JSONArray().apply {
+                                    put(JSONObject().apply {
+                                        put("text", "You are an expert subtitler. Listen to this audio and generate a perfectly timed SRT file. Translate the spoken English directly into Myanmar (Burmese) language. Return ONLY the raw SRT format text starting with block 1. Do NOT include markdown blocks like ```srt.")
+                                    })
+                                    put(JSONObject().apply {
+                                        put("inline_data", JSONObject().apply {
+                                            put("mime_type", "audio/mp4")
+                                            put("data", base64Audio)
+                                        })
+                                    })
+                                })
+                            })
+                        })
+                    }
 
                     val request = Request.Builder()
-                        .url("https://api.groq.com/openai/v1/audio/transcriptions")
-                        .header("Authorization", "Bearer $apiKey")
-                        .post(requestBody)
+                        .url("[https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$apiKey](https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$apiKey)")
+                        .post(geminiJson.toString().toRequestBody(jsonMediaType))
                         .build()
 
                     val response = client.newCall(request).execute()
                     val responseStr = response.body?.string()
 
                     if (response.isSuccessful && responseStr != null) {
-                        
-                        val engSrtContent = parseVerboseJsonToSrt(responseStr)
-                        
-                        withContext(Dispatchers.Main) {
-                            statusText.text = "🇲🇲 ၃။ Llama AI ဖြင့် မြန်မာလို ဘာသာပြန်နေပါသည်..."
-                        }
-
-                        val jsonMediaType = "application/json; charset=utf-8".toMediaTypeOrNull()
-                        val translateJson = JSONObject().apply {
-                            put("model", "llama-3.3-70b-versatile")
-                            put("messages", org.json.JSONArray().apply {
-                                put(JSONObject().apply {
-                                    put("role", "system")
-                                    put("content", "You are an expert subtitle translator. Translate the following English SRT to Myanmar (Burmese). You MUST keep the exact original SRT format, block numbers, and timestamps (00:00:00,000 --> 00:00:00,000). ONLY translate the subtitle text to Burmese. DO NOT add any other explanation.")
-                                })
-                                put(JSONObject().apply {
-                                    put("role", "user")
-                                    put("content", engSrtContent)
-                                })
-                            })
-                            put("temperature", 0.3)
-                        }
-
-                        val transRequest = Request.Builder()
-                            .url("https://api.groq.com/openai/v1/chat/completions")
-                            .header("Authorization", "Bearer $apiKey")
-                            .post(translateJson.toString().toRequestBody(jsonMediaType)) // ဤနေရာတွင် မှန်ကန်စွာ ပြင်ဆင်ထားပါသည်
-                            .build()
-
-                        val transResponse = client.newCall(transRequest).execute()
-                        val transResponseStr = transResponse.body?.string()
-
-                        if (transResponse.isSuccessful && transResponseStr != null) {
-                            val translatedText = JSONObject(transResponseStr)
-                                .getJSONArray("choices")
+                        try {
+                            val root = JSONObject(responseStr)
+                            var extractedText = root.getJSONArray("candidates")
                                 .getJSONObject(0)
-                                .getJSONObject("message")
-                                .getString("content")
+                                .getJSONObject("content")
+                                .getJSONArray("parts")
+                                .getJSONObject(0)
+                                .getString("text")
                             
-                            generatedSrtContent = translatedText
+                            // Markdown tag များ ပါလာပါက ဖြုတ်ပစ်ရန်
+                            extractedText = extractedText.replace("```srt", "").replace("```", "").trim()
+                            
+                            generatedSrtContent = extractedText
 
                             withContext(Dispatchers.Main) {
                                 statusText.text = "✅ ပြီးစီးပါပြီ! မြန်မာ SRT ဖိုင်ကို သိမ်းပါ။"
-                                saveSrtLauncher.launch("myanmar_subtitle.srt")
+                                saveSrtLauncher.launch("gemini_myanmar.srt")
                             }
-                        } else {
+                        } catch (e: Exception) {
                             withContext(Dispatchers.Main) {
-                                statusText.text = "❌ ဘာသာပြန်ခြင်း အဆင်မပြေပါ။"
+                                statusText.text = "❌ Gemini မှ အဖြေမရရှိပါ။"
                                 statusText.setTextColor(Color.parseColor("#FF5252"))
                             }
                         }
-
                     } else {
                         val errorMsg = try {
                             JSONObject(responseStr ?: "").getJSONObject("error").getString("message")
@@ -258,6 +263,7 @@ class MainActivity : ComponentActivity() {
             }
         }
 
+        layout.addView(logoContainer)
         layout.addView(titleText)
         layout.addView(apiKeyInput)
         layout.addView(TextView(this).apply { height = 60 })
@@ -266,36 +272,6 @@ class MainActivity : ComponentActivity() {
         layout.addView(generateButton)
 
         setContentView(layout)
-    }
-
-    private fun parseVerboseJsonToSrt(jsonStr: String): String {
-        val srtBuilder = StringBuilder()
-        try {
-            val jsonObject = JSONObject(jsonStr)
-            val segments = jsonObject.getJSONArray("segments")
-            for (i in 0 until segments.length()) {
-                val segment = segments.getJSONObject(i)
-                val start = segment.getDouble("start")
-                val end = segment.getDouble("end")
-                val text = segment.getString("text").trim()
-                
-                srtBuilder.append(i + 1).append("\n")
-                srtBuilder.append(formatTimestamp(start)).append(" --> ").append(formatTimestamp(end)).append("\n")
-                srtBuilder.append(text).append("\n\n")
-            }
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
-        return srtBuilder.toString()
-    }
-
-    private fun formatTimestamp(seconds: Double): String {
-        val millis = (seconds * 1000).toLong()
-        val hours = TimeUnit.MILLISECONDS.toHours(millis)
-        val minutes = TimeUnit.MILLISECONDS.toMinutes(millis) % 60
-        val secs = TimeUnit.MILLISECONDS.toSeconds(millis) % 60
-        val ms = millis % 1000
-        return String.format(Locale.US, "%02d:%02d:%02d,%03d", hours, minutes, secs, ms)
     }
 
     private fun extractAudioFromVideo(videoUri: Uri, outputPath: String): Boolean {
