@@ -10,6 +10,7 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
+        maven("https://jitpack.io") // FFmpeg လို library များအတွက် ဤလိုင်းကို ထပ်ဖြည့်ထားသည်
     }
 }
 rootProject.name = "SrtApp"
