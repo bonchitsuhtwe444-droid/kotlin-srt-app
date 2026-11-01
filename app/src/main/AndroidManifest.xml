@@ -7,7 +7,9 @@
 
     <application
         android:allowBackup="true"
-        android:label="SRT Kotlin App"
+        android:icon="@android:ic_menu_slideshow"
+        android:label="Auto SRT Gen"
+        android:roundIcon="@android:ic_menu_slideshow"
         android:supportsRtl="true"
         android:theme="@android:style/Theme.NoTitleBar">
         <activity
@@ -20,3 +22,4 @@
         </activity>
     </application>
 </manifest>
+
