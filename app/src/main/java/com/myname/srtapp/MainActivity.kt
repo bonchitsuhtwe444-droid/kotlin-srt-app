@@ -23,6 +23,7 @@ import okhttp3.MultipartBody
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.asRequestBody
+import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
 import java.io.File
 import java.nio.ByteBuffer
@@ -63,7 +64,6 @@ class MainActivity : ComponentActivity() {
             setPadding(60, 80, 60, 80)
         }
 
-        // 📢 Logo အသစ် (ကာစိုစို Design)
         val titleText = TextView(this).apply {
             text = "📢 Auto SRT Gen\n✨ (Burmese AI Edition)"
             textSize = 26f
@@ -74,7 +74,6 @@ class MainActivity : ComponentActivity() {
             setShadowLayer(10f, 0f, 0f, Color.parseColor("#00c6ff"))
         }
 
-        // 🔑 API Key ကို Password လို ဖုံးကွယ်ထားခြင်း
         val apiKeyInput = EditText(this).apply {
             hint = "🔑 Groq API Key ထည့်ပါ"
             setHintTextColor(Color.parseColor("#787878"))
@@ -160,7 +159,6 @@ class MainActivity : ComponentActivity() {
                         .readTimeout(120, TimeUnit.SECONDS)
                         .build()
 
-                    // အဆင့် (၁) Whisper ဖြင့် စာသားထုတ်ခြင်း
                     val requestBody = MultipartBody.Builder()
                         .setType(MultipartBody.FORM)
                         .addFormDataPart("model", "whisper-large-v3")
@@ -188,7 +186,6 @@ class MainActivity : ComponentActivity() {
                             statusText.text = "🇲🇲 ၃။ Llama AI ဖြင့် မြန်မာလို ဘာသာပြန်နေပါသည်..."
                         }
 
-                        // အဆင့် (၂) Llama 3 ဖြင့် မြန်မာလို ဘာသာပြန်ခြင်း
                         val jsonMediaType = "application/json; charset=utf-8".toMediaTypeOrNull()
                         val translateJson = JSONObject().apply {
                             put("model", "llama-3.3-70b-versatile")
@@ -208,7 +205,7 @@ class MainActivity : ComponentActivity() {
                         val transRequest = Request.Builder()
                             .url("https://api.groq.com/openai/v1/chat/completions")
                             .header("Authorization", "Bearer $apiKey")
-                            .post(translateJson.toString().asRequestBody(jsonMediaType))
+                            .post(translateJson.toString().toRequestBody(jsonMediaType)) // ဤနေရာတွင် မှန်ကန်စွာ ပြင်ဆင်ထားပါသည်
                             .build()
 
                         val transResponse = client.newCall(transRequest).execute()
