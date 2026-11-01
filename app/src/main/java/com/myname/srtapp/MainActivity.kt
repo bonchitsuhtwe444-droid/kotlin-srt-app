@@ -25,6 +25,7 @@ import okhttp3.RequestBody.Companion.asRequestBody
 import org.json.JSONObject
 import java.io.File
 import java.nio.ByteBuffer
+import java.util.Locale
 import java.util.concurrent.TimeUnit
 
 class MainActivity : ComponentActivity() {
@@ -33,34 +34,31 @@ class MainActivity : ComponentActivity() {
     private var selectedVideoUri: Uri? = null
     private var generatedSrtContent: String = ""
 
-    // ၁။ Video ရွေးချယ်မည့်စနစ်
     private val pickVideoLauncher = registerForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
         if (uri != null) {
             selectedVideoUri = uri
             statusText.text = "🎬 Video ရွေးချယ်ပြီးပါပြီ။\nအောက်ပါခလုတ်ကိုနှိပ်၍ SRT ထုတ်ပါ။"
-            statusText.setTextColor(Color.parseColor("#00E676")) // Vibrant Green
+            statusText.setTextColor(Color.parseColor("#00E676"))
         }
     }
 
-    // ၂။ SRT သိမ်းဆည်းမည့်စနစ်
     private val saveSrtLauncher = registerForActivityResult(ActivityResultContracts.CreateDocument("application/x-subrip")) { uri: Uri? ->
         if (uri != null) {
             contentResolver.openOutputStream(uri)?.use { outputStream ->
                 outputStream.write(generatedSrtContent.toByteArray())
             }
             statusText.text = "✅ အောင်မြင်ပါသည်။ SRT ဖိုင်ကို သိမ်းဆည်းပြီးပါပြီ။"
-            statusText.setTextColor(Color.parseColor("#00C6FF")) // Platinum Blue
+            statusText.setTextColor(Color.parseColor("#00C6FF"))
         }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Dark Premium Background
         val layout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER
-            setBackgroundColor(Color.parseColor("#0B0C10")) // Deep space dark
+            setBackgroundColor(Color.parseColor("#0B0C10"))
             setPadding(60, 80, 60, 80)
         }
 
@@ -68,7 +66,7 @@ class MainActivity : ComponentActivity() {
             text = "✨ Auto SRT Gen ✨\n(Platinum Edition)"
             textSize = 24f
             setTypeface(null, Typeface.BOLD)
-            setTextColor(Color.parseColor("#E5E4E2")) // Platinum/Silver
+            setTextColor(Color.parseColor("#E5E4E2"))
             gravity = Gravity.CENTER
             setPadding(0, 0, 0, 80)
         }
@@ -82,11 +80,10 @@ class MainActivity : ComponentActivity() {
             background = GradientDrawable().apply {
                 setColor(Color.parseColor("#1F2833"))
                 cornerRadius = 40f
-                setStroke(3, Color.parseColor("#C5C6C7")) // Platinum border
+                setStroke(3, Color.parseColor("#C5C6C7"))
             }
         }
 
-        // ကာစိုစို (Glossy) Button ပြုလုပ်ပေးမည့် Helper Function
         fun createGlossyButton(btnText: String, colorStart: String, colorEnd: String, textColorStr: String): Button {
             return Button(this).apply {
                 text = btnText
@@ -104,7 +101,6 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        // Platinum/Silver ရောင်ပြေး ခလုတ်
         val pickVideoButton = createGlossyButton("📁 Video ဖိုင်ရွေးမည်", "#E0EAFC", "#CFDEF3", "#121212")
         pickVideoButton.setOnClickListener {
             pickVideoLauncher.launch("video/*")
@@ -117,7 +113,6 @@ class MainActivity : ComponentActivity() {
             setPadding(0, 50, 0, 50)
         }
 
-        // ကာစိုစို ရောင်လဲ့လဲ့ (Vibrant Blue/Cyan) ခလုတ်
         val generateButton = createGlossyButton("🚀 SRT စာတန်းထိုး ဖန်တီးမည်", "#00c6ff", "#0072ff", "#FFFFFF")
         
         generateButton.setOnClickListener {
@@ -135,18 +130,16 @@ class MainActivity : ComponentActivity() {
 
             generateButton.isEnabled = false
             statusText.text = "⏳ ၁။ Video မှ အသံဆွဲထုတ်နေပါသည်..."
-            statusText.setTextColor(Color.parseColor("#FFD700")) // Gold
+            statusText.setTextColor(Color.parseColor("#FFD700"))
 
-            // နောက်ကွယ်တွင် အလုပ်လုပ်ရန် Coroutine စတင်ခြင်း
             CoroutineScope(Dispatchers.IO).launch {
                 try {
-                    // အသံဖိုင်ကို ဖုန်း၏ Cache ထဲတွင် ယာယီသိမ်းမည်
                     val audioFile = File(cacheDir, "extracted_audio.m4a")
                     val extractSuccess = extractAudioFromVideo(selectedVideoUri!!, audioFile.absolutePath)
 
                     if (!extractSuccess || !audioFile.exists()) {
                         withContext(Dispatchers.Main) {
-                            statusText.text = "❌ အသံဆွဲထုတ်ခြင်း မအောင်မြင်ပါ။ Video ဖိုင်အမျိုးအစား မှားယွင်းနေနိုင်ပါသည်။"
+                            statusText.text = "❌ အသံဆွဲထုတ်ခြင်း မအောင်မြင်ပါ။"
                             statusText.setTextColor(Color.parseColor("#FF5252"))
                             generateButton.isEnabled = true
                         }
@@ -154,10 +147,9 @@ class MainActivity : ComponentActivity() {
                     }
 
                     withContext(Dispatchers.Main) {
-                        statusText.text = "🌐 ၂။ AI သို့ ပို့ဆောင်နေပါသည် (အင်တာနက်လိုအပ်သည်)..."
+                        statusText.text = "🌐 ၂။ AI ဖြင့် SRT ဖန်တီးနေပါသည်..."
                     }
 
-                    // OkHttp ဖြင့် Groq API သို့ ပို့ခြင်း
                     val client = OkHttpClient.Builder()
                         .connectTimeout(60, TimeUnit.SECONDS)
                         .readTimeout(60, TimeUnit.SECONDS)
@@ -166,7 +158,7 @@ class MainActivity : ComponentActivity() {
                     val requestBody = MultipartBody.Builder()
                         .setType(MultipartBody.FORM)
                         .addFormDataPart("model", "whisper-large-v3")
-                        .addFormDataPart("response_format", "srt")
+                        .addFormDataPart("response_format", "verbose_json") // verbose_json သို့ ပြောင်းထားသည်
                         .addFormDataPart(
                             "file", audioFile.name,
                             audioFile.asRequestBody("audio/m4a".toMediaTypeOrNull())
@@ -183,13 +175,14 @@ class MainActivity : ComponentActivity() {
                     val responseStr = response.body?.string()
 
                     if (response.isSuccessful && responseStr != null) {
-                        generatedSrtContent = responseStr
+                        // JSON ကို SRT အဖြစ် ပြောင်းလဲခြင်း
+                        generatedSrtContent = parseVerboseJsonToSrt(responseStr)
+                        
                         withContext(Dispatchers.Main) {
                             statusText.text = "✅ ပြီးစီးပါပြီ! ဖိုင်သိမ်းမည့်နေရာ ရွေးပါ။"
                             saveSrtLauncher.launch("subtitle.srt")
                         }
                     } else {
-                        // Error ဖြစ်လျှင် JSON ထဲမှ အကြောင်းရင်းကို ထုတ်ပြမည်
                         val errorMsg = try {
                             JSONObject(responseStr ?: "").getJSONObject("error").getString("message")
                         } catch (e: Exception) {
@@ -201,7 +194,7 @@ class MainActivity : ComponentActivity() {
                         }
                     }
                     
-                    audioFile.delete() // ယာယီဖိုင် ဖျက်ပစ်မည်
+                    audioFile.delete()
 
                 } catch (e: Exception) {
                     withContext(Dispatchers.Main) {
@@ -216,7 +209,6 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        // UI များကို မျက်နှာပြင်ပေါ်သို့ စီစဉ်ထည့်သွင်းခြင်း
         layout.addView(titleText)
         layout.addView(apiKeyInput)
         layout.addView(TextView(this).apply { height = 60 })
@@ -227,7 +219,38 @@ class MainActivity : ComponentActivity() {
         setContentView(layout)
     }
 
-    // Android ၏ မူရင်းစနစ်ဖြင့် Video မှ အသံကို စက္ကန့်ပိုင်းအတွင်း ဆွဲထုတ်မည့် Function (FFmpeg ထက် မြန်သည်)
+    // JSON ကို SRT Format အဖြစ် အလိုအလျောက် ပြောင်းပေးမည့် Function
+    private fun parseVerboseJsonToSrt(jsonStr: String): String {
+        val srtBuilder = StringBuilder()
+        try {
+            val jsonObject = JSONObject(jsonStr)
+            val segments = jsonObject.getJSONArray("segments")
+            for (i in 0 until segments.length()) {
+                val segment = segments.getJSONObject(i)
+                val start = segment.getDouble("start")
+                val end = segment.getDouble("end")
+                val text = segment.getString("text").trim()
+                
+                srtBuilder.append(i + 1).append("\n")
+                srtBuilder.append(formatTimestamp(start)).append(" --> ").append(formatTimestamp(end)).append("\n")
+                srtBuilder.append(text).append("\n\n")
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+        return srtBuilder.toString()
+    }
+
+    // စက္ကန့်ကို SRT အချိန် Format (00:00:00,000) သို့ ပြောင်းပေးမည့် Function
+    private fun formatTimestamp(seconds: Double): String {
+        val millis = (seconds * 1000).toLong()
+        val hours = TimeUnit.MILLISECONDS.toHours(millis)
+        val minutes = TimeUnit.MILLISECONDS.toMinutes(millis) % 60
+        val secs = TimeUnit.MILLISECONDS.toSeconds(millis) % 60
+        val ms = millis % 1000
+        return String.format(Locale.US, "%02d:%02d:%02d,%03d", hours, minutes, secs, ms)
+    }
+
     private fun extractAudioFromVideo(videoUri: Uri, outputPath: String): Boolean {
         val extractor = MediaExtractor()
         try {
