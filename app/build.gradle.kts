@@ -15,7 +15,7 @@ android {
         versionName = "1.0"
     }
 
-    // Java 17 ကို အသုံးပြုရန် သတ်မှတ်ချက်များ ထပ်ဖြည့်ထားသည်
+    // Java 17 ကို အသုံးပြုရန် သတ်မှတ်ချက်များ
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
@@ -34,4 +34,14 @@ android {
 
 dependencies {
     implementation("androidx.core:core-ktx:1.12.0")
+    implementation("androidx.activity:activity-ktx:1.8.0")
+    
+    // အသံဖြတ်ရန် (FFmpeg Audio Kit)
+    implementation("com.arthenica:ffmpeg-kit-audio:6.0-2")
+    
+    // Groq API သို့ လှမ်းချိတ်ရန် (OkHttp)
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    
+    // နောက်ကွယ်မှ အလုပ်လုပ်ရန် (Coroutines)
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
 }
