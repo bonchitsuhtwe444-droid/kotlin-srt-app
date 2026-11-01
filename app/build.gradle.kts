@@ -37,7 +37,7 @@ dependencies {
     implementation("androidx.activity:activity-ktx:1.8.0")
     
     // အသံဖြတ်ရန် (FFmpeg Audio Kit)
-    implementation("com.arthenica:ffmpeg-kit-audio:6.0-2")
+    implementation("com.arthenica:ffmpeg-kit-audio:5.1")
     
     // Groq API သို့ လှမ်းချိတ်ရန် (OkHttp)
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
