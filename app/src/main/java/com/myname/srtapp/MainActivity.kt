@@ -9,6 +9,7 @@ import android.media.MediaFormat
 import android.media.MediaMuxer
 import android.net.Uri
 import android.os.Bundle
+import android.text.InputType
 import android.view.Gravity
 import android.widget.Button
 import android.widget.EditText
@@ -47,7 +48,7 @@ class MainActivity : ComponentActivity() {
             contentResolver.openOutputStream(uri)?.use { outputStream ->
                 outputStream.write(generatedSrtContent.toByteArray())
             }
-            statusText.text = "✅ အောင်မြင်ပါသည်။ SRT ဖိုင်ကို သိမ်းဆည်းပြီးပါပြီ။"
+            statusText.text = "✅ အောင်မြင်ပါသည်။ မြန်မာ SRT ဖိုင်ကို သိမ်းဆည်းပြီးပါပြီ။"
             statusText.setTextColor(Color.parseColor("#00C6FF"))
         }
     }
@@ -62,20 +63,24 @@ class MainActivity : ComponentActivity() {
             setPadding(60, 80, 60, 80)
         }
 
+        // 📢 Logo အသစ် (ကာစိုစို Design)
         val titleText = TextView(this).apply {
-            text = "✨ Auto SRT Gen ✨\n(Platinum Edition)"
-            textSize = 24f
+            text = "📢 Auto SRT Gen\n✨ (Burmese AI Edition)"
+            textSize = 26f
             setTypeface(null, Typeface.BOLD)
             setTextColor(Color.parseColor("#E5E4E2"))
             gravity = Gravity.CENTER
             setPadding(0, 0, 0, 80)
+            setShadowLayer(10f, 0f, 0f, Color.parseColor("#00c6ff"))
         }
 
+        // 🔑 API Key ကို Password လို ဖုံးကွယ်ထားခြင်း
         val apiKeyInput = EditText(this).apply {
             hint = "🔑 Groq API Key ထည့်ပါ"
             setHintTextColor(Color.parseColor("#787878"))
             setTextColor(Color.WHITE)
             gravity = Gravity.CENTER
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
             setPadding(40, 40, 40, 40)
             background = GradientDrawable().apply {
                 setColor(Color.parseColor("#1F2833"))
@@ -113,7 +118,7 @@ class MainActivity : ComponentActivity() {
             setPadding(0, 50, 0, 50)
         }
 
-        val generateButton = createGlossyButton("🚀 SRT စာတန်းထိုး ဖန်တီးမည်", "#00c6ff", "#0072ff", "#FFFFFF")
+        val generateButton = createGlossyButton("🚀 မြန်မာ SRT ဖန်တီးမည်", "#00c6ff", "#0072ff", "#FFFFFF")
         
         generateButton.setOnClickListener {
             val apiKey = apiKeyInput.text.toString().trim()
@@ -147,18 +152,19 @@ class MainActivity : ComponentActivity() {
                     }
 
                     withContext(Dispatchers.Main) {
-                        statusText.text = "🌐 ၂။ AI ဖြင့် SRT ဖန်တီးနေပါသည်..."
+                        statusText.text = "🌐 ၂။ Whisper AI ဖြင့် အသံကို စာပြောင်းနေပါသည်..."
                     }
 
                     val client = OkHttpClient.Builder()
-                        .connectTimeout(60, TimeUnit.SECONDS)
-                        .readTimeout(60, TimeUnit.SECONDS)
+                        .connectTimeout(120, TimeUnit.SECONDS)
+                        .readTimeout(120, TimeUnit.SECONDS)
                         .build()
 
+                    // အဆင့် (၁) Whisper ဖြင့် စာသားထုတ်ခြင်း
                     val requestBody = MultipartBody.Builder()
                         .setType(MultipartBody.FORM)
                         .addFormDataPart("model", "whisper-large-v3")
-                        .addFormDataPart("response_format", "verbose_json") // verbose_json သို့ ပြောင်းထားသည်
+                        .addFormDataPart("response_format", "verbose_json")
                         .addFormDataPart(
                             "file", audioFile.name,
                             audioFile.asRequestBody("audio/m4a".toMediaTypeOrNull())
@@ -175,13 +181,59 @@ class MainActivity : ComponentActivity() {
                     val responseStr = response.body?.string()
 
                     if (response.isSuccessful && responseStr != null) {
-                        // JSON ကို SRT အဖြစ် ပြောင်းလဲခြင်း
-                        generatedSrtContent = parseVerboseJsonToSrt(responseStr)
+                        
+                        val engSrtContent = parseVerboseJsonToSrt(responseStr)
                         
                         withContext(Dispatchers.Main) {
-                            statusText.text = "✅ ပြီးစီးပါပြီ! ဖိုင်သိမ်းမည့်နေရာ ရွေးပါ။"
-                            saveSrtLauncher.launch("subtitle.srt")
+                            statusText.text = "🇲🇲 ၃။ Llama AI ဖြင့် မြန်မာလို ဘာသာပြန်နေပါသည်..."
                         }
+
+                        // အဆင့် (၂) Llama 3 ဖြင့် မြန်မာလို ဘာသာပြန်ခြင်း
+                        val jsonMediaType = "application/json; charset=utf-8".toMediaTypeOrNull()
+                        val translateJson = JSONObject().apply {
+                            put("model", "llama-3.3-70b-versatile")
+                            put("messages", org.json.JSONArray().apply {
+                                put(JSONObject().apply {
+                                    put("role", "system")
+                                    put("content", "You are an expert subtitle translator. Translate the following English SRT to Myanmar (Burmese). You MUST keep the exact original SRT format, block numbers, and timestamps (00:00:00,000 --> 00:00:00,000). ONLY translate the subtitle text to Burmese. DO NOT add any other explanation.")
+                                })
+                                put(JSONObject().apply {
+                                    put("role", "user")
+                                    put("content", engSrtContent)
+                                })
+                            })
+                            put("temperature", 0.3)
+                        }
+
+                        val transRequest = Request.Builder()
+                            .url("https://api.groq.com/openai/v1/chat/completions")
+                            .header("Authorization", "Bearer $apiKey")
+                            .post(translateJson.toString().asRequestBody(jsonMediaType))
+                            .build()
+
+                        val transResponse = client.newCall(transRequest).execute()
+                        val transResponseStr = transResponse.body?.string()
+
+                        if (transResponse.isSuccessful && transResponseStr != null) {
+                            val translatedText = JSONObject(transResponseStr)
+                                .getJSONArray("choices")
+                                .getJSONObject(0)
+                                .getJSONObject("message")
+                                .getString("content")
+                            
+                            generatedSrtContent = translatedText
+
+                            withContext(Dispatchers.Main) {
+                                statusText.text = "✅ ပြီးစီးပါပြီ! မြန်မာ SRT ဖိုင်ကို သိမ်းပါ။"
+                                saveSrtLauncher.launch("myanmar_subtitle.srt")
+                            }
+                        } else {
+                            withContext(Dispatchers.Main) {
+                                statusText.text = "❌ ဘာသာပြန်ခြင်း အဆင်မပြေပါ။"
+                                statusText.setTextColor(Color.parseColor("#FF5252"))
+                            }
+                        }
+
                     } else {
                         val errorMsg = try {
                             JSONObject(responseStr ?: "").getJSONObject("error").getString("message")
@@ -219,7 +271,6 @@ class MainActivity : ComponentActivity() {
         setContentView(layout)
     }
 
-    // JSON ကို SRT Format အဖြစ် အလိုအလျောက် ပြောင်းပေးမည့် Function
     private fun parseVerboseJsonToSrt(jsonStr: String): String {
         val srtBuilder = StringBuilder()
         try {
@@ -241,7 +292,6 @@ class MainActivity : ComponentActivity() {
         return srtBuilder.toString()
     }
 
-    // စက္ကန့်ကို SRT အချိန် Format (00:00:00,000) သို့ ပြောင်းပေးမည့် Function
     private fun formatTimestamp(seconds: Double): String {
         val millis = (seconds * 1000).toLong()
         val hours = TimeUnit.MILLISECONDS.toHours(millis)
