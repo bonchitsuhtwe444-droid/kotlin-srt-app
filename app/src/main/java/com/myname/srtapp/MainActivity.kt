@@ -14,7 +14,6 @@ import android.util.Base64
 import android.view.Gravity
 import android.widget.Button
 import android.widget.EditText
-import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.activity.ComponentActivity
@@ -63,29 +62,10 @@ class MainActivity : ComponentActivity() {
             setPadding(60, 80, 60, 80)
         }
 
-        // 📢 Logo အသစ် (အဝိုင်းပုံစံ Background ဖြင့်)
-        val logoContainer = FrameLayout(this).apply {
-            background = GradientDrawable().apply {
-                shape = GradientDrawable.OVAL
-                setColor(Color.parseColor("#1F2833"))
-                setStroke(5, Color.parseColor("#00c6ff"))
-            }
-            layoutParams = LinearLayout.LayoutParams(250, 250).apply {
-                gravity = Gravity.CENTER
-                bottomMargin = 30
-            }
-        }
-        val logoEmoji = TextView(this).apply {
-            text = "📢"
-            textSize = 55f
-            gravity = Gravity.CENTER
-            layoutParams = FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT)
-        }
-        logoContainer.addView(logoEmoji)
-
+        // Logo များကို ဖယ်ရှားပြီးဖြစ်၍ ခေါင်းစဉ်ကို သေသပ်စွာ တင်ထားသည်
         val titleText = TextView(this).apply {
             text = "Auto SRT Gen\n✨ (Gemini AI Edition)"
-            textSize = 24f
+            textSize = 26f
             setTypeface(null, Typeface.BOLD)
             setTextColor(Color.parseColor("#E5E4E2"))
             gravity = Gravity.CENTER
@@ -170,10 +150,9 @@ class MainActivity : ComponentActivity() {
                     }
 
                     withContext(Dispatchers.Main) {
-                        statusText.text = "🌐 ၂။ Gemini ဖြင့် SRT နှင့် ဘာသာပြန်ခြင်းကို တပြိုင်နက် လုပ်ဆောင်နေပါသည်..."
+                        statusText.text = "🌐 ၂။ Gemini ဖြင့် SRT နှင့် ဘာသာပြန်ခြင်းကို လုပ်ဆောင်နေပါသည်..."
                     }
 
-                    // Audio ဖိုင်ကို Base64 ပြောင်းခြင်း
                     val bytes = audioFile.readBytes()
                     val base64Audio = Base64.encodeToString(bytes, Base64.NO_WRAP)
 
@@ -184,7 +163,6 @@ class MainActivity : ComponentActivity() {
 
                     val jsonMediaType = "application/json; charset=utf-8".toMediaTypeOrNull()
                     
-                    // Gemini 1.5 Flash သို့ တိုက်ရိုက်ပို့မည့် JSON
                     val geminiJson = JSONObject().apply {
                         put("contents", org.json.JSONArray().apply {
                             put(JSONObject().apply {
@@ -203,8 +181,12 @@ class MainActivity : ComponentActivity() {
                         })
                     }
 
+                    // URL တွင် Space များ ပါမသွားစေရန် trim() လုပ်ထားပါသည်
+                    val cleanedApiKey = apiKey.trim()
+                    val urlStr = "[https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$cleanedApiKey](https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$cleanedApiKey)"
+
                     val request = Request.Builder()
-                        .url("[https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$apiKey](https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$apiKey)")
+                        .url(urlStr)
                         .post(geminiJson.toString().toRequestBody(jsonMediaType))
                         .build()
 
@@ -221,9 +203,7 @@ class MainActivity : ComponentActivity() {
                                 .getJSONObject(0)
                                 .getString("text")
                             
-                            // Markdown tag များ ပါလာပါက ဖြုတ်ပစ်ရန်
                             extractedText = extractedText.replace("```srt", "").replace("```", "").trim()
-                            
                             generatedSrtContent = extractedText
 
                             withContext(Dispatchers.Main) {
@@ -263,7 +243,6 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        layout.addView(logoContainer)
         layout.addView(titleText)
         layout.addView(apiKeyInput)
         layout.addView(TextView(this).apply { height = 60 })
