@@ -1,8 +1,8 @@
 package com.myname.srtapp
 
-import android.content.res.ColorStateList
 import android.graphics.Color
 import android.graphics.Typeface
+import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.GradientDrawable
 import android.media.MediaCodec
 import android.media.MediaExtractor
@@ -14,6 +14,7 @@ import android.text.InputType
 import android.util.Base64
 import android.view.Gravity
 import android.view.View
+import android.view.ViewGroup
 import android.widget.*
 import androidx.activity.ComponentActivity
 import androidx.activity.result.contract.ActivityResultContracts
@@ -33,13 +34,28 @@ class MainActivity : ComponentActivity() {
     private var selectedVideoUri: Uri? = null
     private var generatedSrtContent: String = ""
     private var selectedStyle = "Standard"
-    private var selectedColor = "#FFFFFF" // Default White
+    private var selectedColor = "#FFFFFF"
+
+    // Preview UI Components
+    private lateinit var previewContainer: LinearLayout
+    private lateinit var videoView: VideoView
+    private lateinit var subtitleOverlay: TextView
+    private var isSubVisible = true
+    private var isBgVisible = true
 
     private val pickVideoLauncher = registerForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
         if (uri != null) {
             selectedVideoUri = uri
             statusText.text = "✅ ဗီဒီယိုဖိုင် ရွေးချယ်ပြီးပါပြီ။"
             statusText.setTextColor(Color.parseColor("#4ADE80"))
+            
+            // Show Video Preview
+            previewContainer.visibility = View.VISIBLE
+            videoView.setVideoURI(uri)
+            videoView.setOnPreparedListener { mp -> 
+                mp.isLooping = true 
+                videoView.start()
+            }
         }
     }
 
@@ -57,14 +73,14 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
 
         val scrollView = ScrollView(this).apply {
-            setBackgroundColor(Color.parseColor("#0F172A"))
+            setBackgroundColor(Color.parseColor("#0B101E")) // Obsidian Dark
             isFillViewport = true
         }
 
         val mainLayout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
-            setPadding(50, 80, 50, 80)
+            setPadding(40, 60, 40, 80)
         }
 
         val titleText = TextView(this).apply {
@@ -73,59 +89,94 @@ class MainActivity : ComponentActivity() {
             setTypeface(null, Typeface.BOLD)
             setTextColor(Color.parseColor("#F8FAFC"))
             gravity = Gravity.CENTER
-            setPadding(0, 0, 0, 10)
+            setPadding(0, 0, 0, 5)
         }
         val subTitleText = TextView(this).apply {
-            text = "Pro AI Subtitle Creator"
-            textSize = 14f
-            setTextColor(Color.parseColor("#94A3B8"))
+            text = "Pro AI Subtitle Creator (Platinum Edition)"
+            textSize = 12f
+            setTextColor(Color.parseColor("#00C6FF"))
             gravity = Gravity.CENTER
-            setPadding(0, 0, 0, 60)
+            setPadding(0, 0, 0, 50)
         }
 
         fun createCardSection(title: String, contentView: View): LinearLayout {
             val card = LinearLayout(this@MainActivity).apply {
                 orientation = LinearLayout.VERTICAL
                 background = GradientDrawable().apply {
-                    setColor(Color.parseColor("#1E293B"))
-                    cornerRadius = 30f
-                    setStroke(2, Color.parseColor("#334155"))
+                    setColor(Color.parseColor("#151C2C"))
+                    cornerRadius = 35f
+                    setStroke(2, Color.parseColor("#2A344A"))
                 }
                 setPadding(40, 40, 40, 40)
                 layoutParams = LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT,
                     LinearLayout.LayoutParams.WRAP_CONTENT
-                ).apply {
-                    bottomMargin = 40
-                }
+                ).apply { bottomMargin = 40 }
             }
             val titleView = TextView(this@MainActivity).apply {
                 text = title
                 textSize = 14f
                 setTypeface(null, Typeface.BOLD)
-                setTextColor(Color.parseColor("#38BDF8"))
-                setPadding(0, 0, 0, 20)
+                setTextColor(Color.parseColor("#00C6FF")) // Cyan Title
+                setPadding(0, 0, 0, 25)
             }
             card.addView(titleView)
             card.addView(contentView)
             return card
         }
 
+        // --- PLATINUM SPINNER FUNCTION ---
+        fun createPlatinumSpinner(items: Array<String>, onItemSelected: (Int) -> Unit): Spinner {
+            val spinner = Spinner(this).apply {
+                background = GradientDrawable().apply {
+                    setColor(Color.parseColor("#0B101E"))
+                    cornerRadius = 25f
+                    setStroke(2, Color.parseColor("#00C6FF")) // Platinum Border
+                }
+                setPopupBackgroundDrawable(ColorDrawable(Color.parseColor("#151C2C"))) // Dark Dropdown
+                layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { bottomMargin = 30 }
+            }
+
+            val adapter = object : ArrayAdapter<String>(this, android.R.layout.simple_spinner_dropdown_item, items) {
+                override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
+                    val view = super.getView(position, convertView, parent) as TextView
+                    view.setTextColor(Color.WHITE)
+                    view.setPadding(40, 35, 40, 35)
+                    return view
+                }
+                override fun getDropDownView(position: Int, convertView: View?, parent: ViewGroup): View {
+                    val view = super.getDropDownView(position, convertView, parent) as TextView
+                    view.setTextColor(Color.parseColor("#E2E8F0"))
+                    view.setBackgroundColor(Color.parseColor("#151C2C"))
+                    view.setPadding(50, 40, 50, 40)
+                    return view
+                }
+            }
+            spinner.adapter = adapter
+            spinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+                override fun onItemSelected(p0: AdapterView<*>?, p1: View?, pos: Int, p3: Long) { onItemSelected(pos) }
+                override fun onNothingSelected(p0: AdapterView<*>?) {}
+            }
+            return spinner
+        }
+
+        // --- 1. API Key ---
         val apiKeyInput = EditText(this).apply {
             hint = "Enter Gemini API Key"
-            setHintTextColor(Color.parseColor("#64748B"))
+            setHintTextColor(Color.parseColor("#475569"))
             setTextColor(Color.WHITE)
             textSize = 14f
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
             background = GradientDrawable().apply {
-                setColor(Color.parseColor("#0F172A"))
-                cornerRadius = 20f
+                setColor(Color.parseColor("#0B101E"))
+                cornerRadius = 25f
                 setStroke(2, Color.parseColor("#475569"))
             }
-            setPadding(30, 30, 30, 30)
+            setPadding(40, 35, 40, 35)
         }
         val apiKeyCard = createCardSection("1. Authentication", apiKeyInput)
 
+        // --- 2. Configuration ---
         val mediaLayout = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         
         val btnPickVideo = Button(this).apply {
@@ -133,61 +184,119 @@ class MainActivity : ComponentActivity() {
             isAllCaps = false
             setTextColor(Color.WHITE)
             background = GradientDrawable().apply {
-                setColor(Color.parseColor("#3B82F6"))
-                cornerRadius = 20f
+                setColor(Color.parseColor("#2563EB"))
+                cornerRadius = 25f
             }
-            setPadding(0, 30, 0, 30)
-            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { bottomMargin = 30 }
+            setPadding(0, 35, 0, 35)
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { bottomMargin = 40 }
         }
         btnPickVideo.setOnClickListener { pickVideoLauncher.launch("video/*") }
 
-        val styleSpinner = Spinner(this).apply {
-            val styles = arrayOf("Standard (ပုံမှန်)", "Informal (အလွတ်သဘော)", "Movie Action (အက်ရှင်)", "Comedy (ဟာသ)")
-            val adapter = ArrayAdapter(this@MainActivity, android.R.layout.simple_spinner_dropdown_item, styles)
-            this.adapter = adapter
-            backgroundTintList = ColorStateList.valueOf(Color.WHITE)
-        }
-        styleSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
-            override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
-                if (view is TextView) view.setTextColor(Color.BLACK)
-                selectedStyle = when(position) {
-                    1 -> "Informal and natural"
-                    2 -> "Action movie style, dramatic"
-                    3 -> "Comedic and funny"
-                    else -> "Standard professional"
-                }
-            }
-            override fun onNothingSelected(parent: AdapterView<*>?) {}
-        }
-        
-        val colorSpinner = Spinner(this).apply {
-            val colors = arrayOf("White (အဖြူ)", "Yellow (အဝါ)", "Green (အစိမ်း)", "Cyan (အပြာနု)")
-            val adapter = ArrayAdapter(this@MainActivity, android.R.layout.simple_spinner_dropdown_item, colors)
-            this.adapter = adapter
-            backgroundTintList = ColorStateList.valueOf(Color.WHITE)
-            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { topMargin = 30 }
-        }
-        colorSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
-            override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
-                if (view is TextView) view.setTextColor(Color.BLACK)
-                selectedColor = when(position) {
-                    1 -> "#FFFF00"
-                    2 -> "#00FF00"
-                    3 -> "#00FFFF"
-                    else -> "#FFFFFF"
-                }
-            }
-            override fun onNothingSelected(parent: AdapterView<*>?) {}
-        }
-
         mediaLayout.addView(btnPickVideo)
-        mediaLayout.addView(TextView(this).apply { text = "Translation Tone:"; setTextColor(Color.parseColor("#94A3B8")); setPadding(0, 0, 0, 10) })
-        mediaLayout.addView(styleSpinner)
-        mediaLayout.addView(TextView(this).apply { text = "Subtitle Color:"; setTextColor(Color.parseColor("#94A3B8")); setPadding(0, 20, 0, 10) })
-        mediaLayout.addView(colorSpinner)
+        mediaLayout.addView(TextView(this).apply { text = "Translation Tone:"; setTextColor(Color.parseColor("#94A3B8")); setPadding(10, 0, 0, 15) })
         
+        val styleSpinner = createPlatinumSpinner(arrayOf("Standard (ပုံမှန်)", "Informal (အလွတ်သဘော)", "Movie Action (အက်ရှင်)", "Comedy (ဟာသ)")) { pos ->
+            selectedStyle = when(pos) {
+                1 -> "Informal and natural"
+                2 -> "Action movie style, dramatic"
+                3 -> "Comedic and funny"
+                else -> "Standard professional"
+            }
+        }
+        mediaLayout.addView(styleSpinner)
+
+        mediaLayout.addView(TextView(this).apply { text = "Subtitle Color:"; setTextColor(Color.parseColor("#94A3B8")); setPadding(10, 10, 0, 15) })
+        val colorSpinner = createPlatinumSpinner(arrayOf("White (အဖြူ)", "Yellow (အဝါ)", "Green (အစိမ်း)", "Cyan (အပြာနု)")) { pos ->
+            selectedColor = when(pos) {
+                1 -> "#FFFF00"
+                2 -> "#00FF00"
+                3 -> "#00FFFF"
+                else -> "#FFFFFF"
+            }
+            // Update preview text color if initialized
+            if (::subtitleOverlay.isInitialized) {
+                subtitleOverlay.setTextColor(Color.parseColor(selectedColor))
+            }
+        }
+        mediaLayout.addView(colorSpinner)
         val mediaCard = createCardSection("2. Configuration", mediaLayout)
 
+        // --- 3. Video Preview & Overlays (PHASE 2) ---
+        previewContainer = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            visibility = View.GONE
+        }
+        
+        val frameLayout = FrameLayout(this).apply {
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 600).apply { bottomMargin = 30 }
+            background = GradientDrawable().apply { setColor(Color.BLACK); cornerRadius = 20f }
+            clipToOutline = true
+        }
+        
+        videoView = VideoView(this).apply {
+            layoutParams = FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT).apply { gravity = Gravity.CENTER }
+        }
+        
+        subtitleOverlay = TextView(this).apply {
+            text = "Subtitle Preview\n(စာတန်းထိုး နမူနာ ဤနေရာတွင်ပေါ်မည်)"
+            setTextColor(Color.WHITE)
+            textSize = 16f
+            gravity = Gravity.CENTER
+            setBackgroundColor(Color.parseColor("#99000000")) // Semi-transparent black bg box
+            setPadding(20, 10, 20, 10)
+            layoutParams = FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT).apply {
+                gravity = Gravity.BOTTOM
+                bottomMargin = 40
+            }
+        }
+        
+        frameLayout.addView(videoView)
+        frameLayout.addView(subtitleOverlay)
+        
+        // Toggle Buttons
+        val toggleRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            weightSum = 2f
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
+        }
+        
+        val btnToggleSub = Button(this).apply {
+            text = "💬 Sub: ON"
+            isAllCaps = false
+            setTextColor(Color.WHITE)
+            background = GradientDrawable().apply { setColor(Color.parseColor("#334155")); cornerRadius = 20f }
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply { rightMargin = 10 }
+        }
+        val btnToggleBg = Button(this).apply {
+            text = "⬛ Box: ON"
+            isAllCaps = false
+            setTextColor(Color.WHITE)
+            background = GradientDrawable().apply { setColor(Color.parseColor("#334155")); cornerRadius = 20f }
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply { leftMargin = 10 }
+        }
+        
+        btnToggleSub.setOnClickListener {
+            isSubVisible = !isSubVisible
+            subtitleOverlay.visibility = if (isSubVisible) View.VISIBLE else View.INVISIBLE
+            btnToggleSub.text = if (isSubVisible) "💬 Sub: ON" else "💬 Sub: OFF"
+            btnToggleSub.setTextColor(if (isSubVisible) Color.WHITE else Color.GRAY)
+        }
+        btnToggleBg.setOnClickListener {
+            isBgVisible = !isBgVisible
+            subtitleOverlay.setBackgroundColor(if (isBgVisible) Color.parseColor("#99000000") else Color.TRANSPARENT)
+            btnToggleBg.text = if (isBgVisible) "⬛ Box: ON" else "⬛ Box: OFF"
+            btnToggleBg.setTextColor(if (isBgVisible) Color.WHITE else Color.GRAY)
+        }
+        
+        toggleRow.addView(btnToggleSub)
+        toggleRow.addView(btnToggleBg)
+        
+        previewContainer.addView(frameLayout)
+        previewContainer.addView(toggleRow)
+        
+        val previewCard = createCardSection("3. Live Preview", previewContainer)
+
+        // --- 4. Generation ---
         val statusLayout = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER }
         statusText = TextView(this).apply {
             text = "Waiting to start..."
@@ -203,7 +312,7 @@ class MainActivity : ComponentActivity() {
             setTextColor(Color.WHITE)
             background = GradientDrawable(
                 GradientDrawable.Orientation.TL_BR,
-                intArrayOf(Color.parseColor("#0ea5e9"), Color.parseColor("#2563eb"))
+                intArrayOf(Color.parseColor("#00C6FF"), Color.parseColor("#0072FF"))
             ).apply { cornerRadius = 25f }
             setPadding(0, 40, 0, 40)
             layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
@@ -278,7 +387,6 @@ class MainActivity : ComponentActivity() {
                         })
                     }
 
-                    // ဤနေရာတွင် URL ကို အပိုင်းပိုင်းဖြတ်ရေးထားသဖြင့် Link အပိုပါလာသော Error ထပ်မတက်နိုင်တော့ပါ
                     val cleanedApiKey = apiKey.trim()
                     val domain1 = "generativelanguage"
                     val domain2 = ".googleapis.com"
@@ -311,6 +419,8 @@ class MainActivity : ComponentActivity() {
                                 statusText.text = "✅ ပြီးစီးပါပြီ! SRT ဖိုင်ကို သိမ်းပါ။"
                                 statusText.setTextColor(Color.parseColor("#4ADE80"))
                                 saveSrtLauncher.launch("gemini_myanmar.srt")
+                                // Update preview with real subtitle sample
+                                subtitleOverlay.text = "Generation Complete!\n(SRT is ready to save)"
                             }
                         } catch (e: Exception) {
                             withContext(Dispatchers.Main) {
@@ -342,12 +452,13 @@ class MainActivity : ComponentActivity() {
 
         statusLayout.addView(statusText)
         statusLayout.addView(btnGenerate)
-        val actionCard = createCardSection("3. Action", statusLayout)
+        val actionCard = createCardSection("4. Action", statusLayout)
 
         mainLayout.addView(titleText)
         mainLayout.addView(subTitleText)
         mainLayout.addView(apiKeyCard)
         mainLayout.addView(mediaCard)
+        mainLayout.addView(previewCard) // Added Video Preview Card
         mainLayout.addView(actionCard)
 
         scrollView.addView(mainLayout)
