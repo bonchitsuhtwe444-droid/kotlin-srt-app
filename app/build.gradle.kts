@@ -43,5 +43,5 @@ dependencies {
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     
     // FFmpegKit (Video Export ထုတ်ရန်အတွက်)
-    implementation("com.arthenica:ffmpeg-kit-full:5.1.0")
+    implementation("com.arthenica:ffmpeg-kit-full:5.1")
 }
