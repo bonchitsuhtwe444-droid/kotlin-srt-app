@@ -329,7 +329,6 @@ class MainActivity : ComponentActivity() {
         
         val previewCard = createCardSection("3. Live Preview (Drag & Zoom)", previewContainer)
 
-        // --- 4. Generation & Export ---
         val statusLayout = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER }
         statusText = TextView(this).apply {
             text = "Waiting to start..."
@@ -352,7 +351,6 @@ class MainActivity : ComponentActivity() {
             layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { bottomMargin = 20 }
         }
 
-        // 🎬 Export Video ခလုတ်အသစ်
         val btnExportVideo = Button(this).apply {
             text = "🎬 2. Export Video (Burn-in)"
             isAllCaps = false
@@ -361,11 +359,11 @@ class MainActivity : ComponentActivity() {
             setTextColor(Color.WHITE)
             background = GradientDrawable(
                 GradientDrawable.Orientation.TL_BR,
-                intArrayOf(Color.parseColor("#F59E0B"), Color.parseColor("#D97706")) // Amber Color
+                intArrayOf(Color.parseColor("#F59E0B"), Color.parseColor("#D97706"))
             ).apply { cornerRadius = 25f }
             setPadding(0, 40, 0, 40)
             layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
-            visibility = View.GONE // အစပိုင်းတွင် ဖျောက်ထားမည်
+            visibility = View.GONE
         }
 
         btnGenerate.setOnClickListener {
@@ -471,7 +469,7 @@ class MainActivity : ComponentActivity() {
                                 statusText.setTextColor(Color.parseColor("#4ADE80"))
                                 saveSrtLauncher.launch("gemini_myanmar.srt")
                                 subtitleOverlay.text = "🎉 ဖန်တီးမှု ပြီးစီးပါပြီ!\n(အောက်ပါခလုတ်ဖြင့် Video ထုတ်နိုင်ပါပြီ)"
-                                btnExportVideo.visibility = View.VISIBLE // SRT ရပြီဆိုမှ Video ခလုတ်ပေါ်မည်
+                                btnExportVideo.visibility = View.VISIBLE
                             }
                         } catch (e: Exception) {
                             withContext(Dispatchers.Main) {
@@ -501,7 +499,7 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        // FFmpeg Export Logic
+        // FFmpeg Export Logic (Crash Fix)
         btnExportVideo.setOnClickListener {
             if (generatedSrtContent.isEmpty() || selectedVideoUri == null) return@setOnClickListener
             
@@ -512,7 +510,6 @@ class MainActivity : ComponentActivity() {
 
             CoroutineScope(Dispatchers.IO).launch {
                 try {
-                    // ၁။ Video ဖိုင်ကို Cache ထဲ ကူးယူခြင်း (FFmpeg ဖတ်နိုင်ရန်)
                     val inputVideoFile = File(cacheDir, "input_video.mp4")
                     contentResolver.openInputStream(selectedVideoUri!!)?.use { input ->
                         FileOutputStream(inputVideoFile).use { output ->
@@ -520,53 +517,55 @@ class MainActivity : ComponentActivity() {
                         }
                     }
 
-                    // ၂။ SRT ဖိုင်ကို Cache ထဲ သိမ်းခြင်း
                     val srtFile = File(cacheDir, "temp_sub.srt")
                     srtFile.writeText(generatedSrtContent)
 
-                    // ၃။ Output ဖိုင်နေရာ သတ်မှတ်ခြင်း
                     val outputVideoFile = File(cacheDir, "output_video.mp4")
                     if (outputVideoFile.exists()) outputVideoFile.delete()
 
-                    // ၄။ FFmpeg Command တည်ဆောက်ခြင်း
                     val boxStyle = if (isBgVisible) "BorderStyle=4,BackColour=&H80000000," else ""
                     val srtPath = srtFile.absolutePath.replace("'", "\\\\'")
                     
-                    // မှတ်ချက် - လက်ဖြင့် ရွှေ့ထားသော အတိအကျ X/Y နေရာကို FFmpeg တွင် တိုက်ရိုက်ချိတ်ဆက်ရန် အလွန်ခက်ခဲသောကြောင့်
-                    // ဤအဆင့်တွင် စာတန်းထိုးကို အရောင်နှင့် Box ပါဝင်အောင်သာ အရင်ဆုံး Burn-in လုပ်ပြထားပါသည်။ 
-                    // (Build အောင်မြင်ပါက နောက်အဆင့်တွင် Matrix တွက်ချက်မှု ထပ်ပေါင်းထည့်ပါမည်)
-                    val cmd = "-y -i \"${inputVideoFile.absolutePath}\" -vf \"subtitles='${srtPath}':force_style='${boxStyle}Fontsize=18'\" -c:v libx264 -preset fast -c:a copy \"${outputVideoFile.absolutePath}\""
+                    val cmd = "-y -i \"${inputVideoFile.absolutePath}\" -vf \"subtitles='${srtPath}':fontsdir=/system/fonts:force_style='${boxStyle}Fontsize=18'\" -c:v libx264 -preset ultrafast -threads 2 -c:a copy \"${outputVideoFile.absolutePath}\""
 
-                    // ၅။ FFmpegKit ဖြင့် Run ခြင်း
                     val session = FFmpegKit.execute(cmd)
                     
                     if (ReturnCode.isSuccess(session.returnCode)) {
-                        // ၆။ အောင်မြင်ပါက Gallery/Downloads ထဲသို့ ရွှေ့ပေးခြင်း
-                        val values = ContentValues().apply {
-                            put(MediaStore.Video.Media.DISPLAY_NAME, "AutoSRT_Export_${System.currentTimeMillis()}.mp4")
-                            put(MediaStore.Video.Media.MIME_TYPE, "video/mp4")
-                            put(MediaStore.Video.Media.RELATIVE_PATH, Environment.DIRECTORY_MOVIES + "/AutoSRT")
-                        }
-                        
-                        val uri = contentResolver.insert(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, values)
-                        if (uri != null) {
-                            contentResolver.openOutputStream(uri)?.use { out ->
-                                outputVideoFile.inputStream().use { it.copyTo(out) }
+                        var isSaved = false
+                        try {
+                            val values = ContentValues().apply {
+                                put(MediaStore.Video.Media.DISPLAY_NAME, "AutoSRT_Export_${System.currentTimeMillis()}.mp4")
+                                put(MediaStore.Video.Media.MIME_TYPE, "video/mp4")
+                                put(MediaStore.Video.Media.RELATIVE_PATH, Environment.DIRECTORY_MOVIES + "/AutoSRT")
                             }
+                            
+                            val uri = contentResolver.insert(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, values)
+                            if (uri != null) {
+                                contentResolver.openOutputStream(uri)?.use { out ->
+                                    outputVideoFile.inputStream().use { it.copyTo(out) }
+                                }
+                                isSaved = true
+                            }
+                        } catch (e: Exception) {
+                            e.printStackTrace()
                         }
 
                         withContext(Dispatchers.Main) {
-                            statusText.text = "✅ အောင်မြင်ပါသည်!\nဗီဒီယိုကို ဖုန်း Gallery (Movies/AutoSRT) ထဲတွင် ကြည့်နိုင်ပါပြီ။"
-                            statusText.setTextColor(Color.parseColor("#4ADE80"))
+                            if (isSaved) {
+                                statusText.text = "✅ အောင်မြင်ပါသည်!\nဗီဒီယိုကို ဖုန်း Gallery (Movies/AutoSRT) ထဲတွင် ကြည့်နိုင်ပါပြီ။"
+                                statusText.setTextColor(Color.parseColor("#4ADE80"))
+                            } else {
+                                statusText.text = "❌ ဖိုင်သိမ်းရန် ခွင့်ပြုချက် လိုအပ်နေပါသည်။"
+                                statusText.setTextColor(Color.parseColor("#EF4444"))
+                            }
                         }
                     } else {
                         withContext(Dispatchers.Main) {
-                            statusText.text = "❌ Rendering Failed! (FFmpeg Error)"
+                            statusText.text = "❌ Rendering Failed! Video မှာ ကြီးမား/ရှုပ်ထွေးလွန်းနေပါသည်။"
                             statusText.setTextColor(Color.parseColor("#EF4444"))
                         }
                     }
 
-                    // Clean up temp files
                     inputVideoFile.delete()
                     srtFile.delete()
                     outputVideoFile.delete()
@@ -639,8 +638,8 @@ class MainActivity : ComponentActivity() {
             val muxerTrackIndex = muxer.addTrack(format)
             muxer.start()
 
-            val bufferSize = format.getInteger(MediaFormat.KEY_MAX_INPUT_SIZE).takeIf { it > 0 } ?: (1024 * 1024)
-            val buffer = ByteBuffer.allocate(bufferSize)
+            val bufferSize = format.getInteger(MediaFormat.KEY_MAX_INPUT_SIZE).takeIf { it > 0 } > 0 ?: (1024 * 1024)
+            val buffer = ByteBuffer.allocate(bufferSize.let { if (it is Int) it else 1024 * 1024 })
             val bufferInfo = MediaCodec.BufferInfo()
             var lastProgress = -1
 
