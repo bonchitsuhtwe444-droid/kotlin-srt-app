@@ -283,7 +283,7 @@ class MainActivity : ComponentActivity() {
                     // ပြင်ဆင်ချက် - URL တွင် Markdown Error မတက်စေရန် ခွဲရေးပေးထားပြီး Gemini 3.8 ကို ထည့်ထားပါသည်
                     val baseUrl = "[https://generativelanguage.googleapis.com](https://generativelanguage.googleapis.com)"
                     val endpoint = "/v1beta/models/gemini-3.8-flash:generateContent?key="
-                    val urlStr = baseUrl + endpoint + apiKey
+                    val urlStr = "https://" + "generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=" + cleanedApiKey
                     
                     val request = Request.Builder().url(urlStr).post(geminiJson.toString().toRequestBody(jsonMediaType)).build()
 
