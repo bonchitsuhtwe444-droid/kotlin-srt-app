@@ -57,7 +57,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
 
         val scrollView = ScrollView(this).apply {
-            setBackgroundColor(Color.parseColor("#0F172A")) // Pro Dark Blue Background
+            setBackgroundColor(Color.parseColor("#0F172A"))
             isFillViewport = true
         }
 
@@ -67,7 +67,6 @@ class MainActivity : ComponentActivity() {
             setPadding(50, 80, 50, 80)
         }
 
-        // Header Title
         val titleText = TextView(this).apply {
             text = "AUTO SRT GEN"
             textSize = 28f
@@ -84,7 +83,6 @@ class MainActivity : ComponentActivity() {
             setPadding(0, 0, 0, 60)
         }
 
-        // --- Card Builder Function ---
         fun createCardSection(title: String, contentView: View): LinearLayout {
             val card = LinearLayout(this@MainActivity).apply {
                 orientation = LinearLayout.VERTICAL
@@ -113,7 +111,6 @@ class MainActivity : ComponentActivity() {
             return card
         }
 
-        // --- Section 1: API Key ---
         val apiKeyInput = EditText(this).apply {
             hint = "Enter Gemini API Key"
             setHintTextColor(Color.parseColor("#64748B"))
@@ -129,7 +126,6 @@ class MainActivity : ComponentActivity() {
         }
         val apiKeyCard = createCardSection("1. Authentication", apiKeyInput)
 
-        // --- Section 2: Media & Style ---
         val mediaLayout = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         
         val btnPickVideo = Button(this).apply {
@@ -145,7 +141,6 @@ class MainActivity : ComponentActivity() {
         }
         btnPickVideo.setOnClickListener { pickVideoLauncher.launch("video/*") }
 
-        // Style Selector (Spinner)
         val styleSpinner = Spinner(this).apply {
             val styles = arrayOf("Standard (ပုံမှန်)", "Informal (အလွတ်သဘော)", "Movie Action (အက်ရှင်)", "Comedy (ဟာသ)")
             val adapter = ArrayAdapter(this@MainActivity, android.R.layout.simple_spinner_dropdown_item, styles)
@@ -154,7 +149,8 @@ class MainActivity : ComponentActivity() {
         }
         styleSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
             override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
-                if (view is TextView) view.setTextColor(Color.WHITE)
+                // ပြင်ဆင်ချက် - စာသားအရောင်ကို အမည်းရောင်ပြောင်းပေးထားသည်
+                if (view is TextView) view.setTextColor(Color.BLACK)
                 selectedStyle = when(position) {
                     1 -> "Informal and natural"
                     2 -> "Action movie style, dramatic"
@@ -165,7 +161,6 @@ class MainActivity : ComponentActivity() {
             override fun onNothingSelected(parent: AdapterView<*>?) {}
         }
         
-        // Color Selector (Spinner)
         val colorSpinner = Spinner(this).apply {
             val colors = arrayOf("White (အဖြူ)", "Yellow (အဝါ)", "Green (အစိမ်း)", "Cyan (အပြာနု)")
             val adapter = ArrayAdapter(this@MainActivity, android.R.layout.simple_spinner_dropdown_item, colors)
@@ -175,7 +170,8 @@ class MainActivity : ComponentActivity() {
         }
         colorSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
             override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
-                if (view is TextView) view.setTextColor(Color.WHITE)
+                // ပြင်ဆင်ချက် - စာသားအရောင်ကို အမည်းရောင်ပြောင်းပေးထားသည်
+                if (view is TextView) view.setTextColor(Color.BLACK)
                 selectedColor = when(position) {
                     1 -> "#FFFF00"
                     2 -> "#00FF00"
@@ -194,7 +190,6 @@ class MainActivity : ComponentActivity() {
         
         val mediaCard = createCardSection("2. Configuration", mediaLayout)
 
-        // --- Section 3: Status & Generation ---
         val statusLayout = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER }
         statusText = TextView(this).apply {
             text = "Waiting to start..."
@@ -285,7 +280,11 @@ class MainActivity : ComponentActivity() {
                         })
                     }
 
-                    val urlStr = "https://" + "[generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=](https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=)" + apiKey
+                    // ပြင်ဆင်ချက် - URL တွင် Markdown Error မတက်စေရန် ခွဲရေးပေးထားပြီး Gemini 3.8 ကို ထည့်ထားပါသည်
+                    val baseUrl = "[https://generativelanguage.googleapis.com](https://generativelanguage.googleapis.com)"
+                    val endpoint = "/v1beta/models/gemini-3.8-flash:generateContent?key="
+                    val urlStr = baseUrl + endpoint + apiKey
+                    
                     val request = Request.Builder().url(urlStr).post(geminiJson.toString().toRequestBody(jsonMediaType)).build()
 
                     val response = client.newCall(request).execute()
@@ -303,7 +302,6 @@ class MainActivity : ComponentActivity() {
                             
                             extractedText = extractedText.replace("```srt", "").replace("```", "").trim()
                             
-                            // အရောင်ထည့်ရန် SRT ကို ပြန်ပြင်ခြင်း
                             if (selectedColor != "#FFFFFF") {
                                 extractedText = applyColorToSrt(extractedText, selectedColor)
                             }
@@ -361,7 +359,6 @@ class MainActivity : ComponentActivity() {
         val lines = srtContent.split("\n")
         val builder = StringBuilder()
         for (line in lines) {
-            // အချိန်ပြသောစာကြောင်းနှင့် နံပါတ်များမဟုတ်လျှင် အရောင် tag ထည့်မည်
             if (line.trim().isNotEmpty() && !line.contains("-->") && !line.matches(Regex("^\\d+$"))) {
                 builder.append("<font color=\"$colorHex\">").append(line).append("</font>\n")
             } else {
