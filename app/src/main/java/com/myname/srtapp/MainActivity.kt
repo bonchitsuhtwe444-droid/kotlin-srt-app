@@ -25,6 +25,7 @@ import android.widget.*
 import androidx.activity.ComponentActivity
 import androidx.activity.result.contract.ActivityResultContracts
 import com.arthenica.ffmpegkit.FFmpegKit
+import com.arthenica.ffmpegkit.FFmpegKitConfig
 import com.arthenica.ffmpegkit.ReturnCode
 import kotlinx.coroutines.*
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
@@ -45,9 +46,10 @@ class MainActivity : ComponentActivity() {
     private var selectedStyle = "Standard"
     private var selectedColor = "#FFFFFF"
 
-    private lateinit var previewContainer: LinearLayout
     private lateinit var videoView: VideoView
     private lateinit var subtitleOverlay: TextView
+    private lateinit var btnExportVideo: Button
+    
     private var isSubVisible = true
     private var isBgVisible = true
 
@@ -61,7 +63,7 @@ class MainActivity : ComponentActivity() {
             statusText.text = "✅ ဗီဒီယိုဖိုင် ရွေးချယ်ပြီးပါပြီ။"
             statusText.setTextColor(Color.parseColor("#4ADE80"))
             
-            previewContainer.visibility = View.VISIBLE
+            // VideoView သည် မူရင်း Aspect Ratio (16:9, 9:16) အတိုင်း အလိုလိုချိန်ညှိပေးပါမည်
             videoView.setVideoURI(uri)
             videoView.setOnPreparedListener { mp -> 
                 mp.isLooping = true 
@@ -75,7 +77,7 @@ class MainActivity : ComponentActivity() {
             contentResolver.openOutputStream(uri)?.use { outputStream ->
                 outputStream.write(generatedSrtContent.toByteArray())
             }
-            statusText.text = "🎉 SRT ဖိုင်ကို အောင်မြင်စွာ သိမ်းဆည်းပြီးပါပြီ။"
+            statusText.text = "🎉 SRT ဖိုင်ကို သိမ်းဆည်းပြီးပါပြီ။"
             statusText.setTextColor(Color.parseColor("#38BDF8"))
         }
     }
@@ -84,93 +86,28 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        val scrollView = ScrollView(this).apply {
-            setBackgroundColor(Color.parseColor("#0B101E"))
-            isFillViewport = true
-        }
+        // အရေးကြီးဆုံး Fix: Export လုပ်ချိန် App မပိတ်ကျစေရန် Font လမ်းကြောင်း ကြိုတင်သတ်မှတ်ခြင်း
+        FFmpegKitConfig.setFontDirectory(this, "/system/fonts", mapOf())
 
+        // ScrollView ကို ဖယ်ရှားပြီး Fixed Screen (Main Layout) အဖြစ် ပြောင်းလဲထားသည်
         val mainLayout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
-            setPadding(40, 60, 40, 80)
+            setBackgroundColor(Color.parseColor("#0B101E")) // Obsidian Dark
+            layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
+            setPadding(30, 40, 30, 40)
         }
 
+        // 1. Title
         val titleText = TextView(this).apply {
             text = "AUTO SRT GEN"
-            textSize = 28f
+            textSize = 22f
             setTypeface(null, Typeface.BOLD)
-            setTextColor(Color.parseColor("#F8FAFC"))
-            gravity = Gravity.CENTER
-            setPadding(0, 0, 0, 5)
-        }
-        val subTitleText = TextView(this).apply {
-            text = "Pro AI Subtitle Creator (Platinum Edition)"
-            textSize = 12f
             setTextColor(Color.parseColor("#00C6FF"))
             gravity = Gravity.CENTER
-            setPadding(0, 0, 0, 50)
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { bottomMargin = 20 }
         }
 
-        fun createCardSection(title: String, contentView: View): LinearLayout {
-            val card = LinearLayout(this@MainActivity).apply {
-                orientation = LinearLayout.VERTICAL
-                background = GradientDrawable().apply {
-                    setColor(Color.parseColor("#151C2C"))
-                    cornerRadius = 35f
-                    setStroke(2, Color.parseColor("#2A344A"))
-                }
-                setPadding(40, 40, 40, 40)
-                layoutParams = LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT
-                ).apply { bottomMargin = 40 }
-            }
-            val titleView = TextView(this@MainActivity).apply {
-                text = title
-                textSize = 14f
-                setTypeface(null, Typeface.BOLD)
-                setTextColor(Color.parseColor("#00C6FF"))
-                setPadding(0, 0, 0, 25)
-            }
-            card.addView(titleView)
-            card.addView(contentView)
-            return card
-        }
-
-        fun createPlatinumSpinner(items: Array<String>, onItemSelected: (Int) -> Unit): Spinner {
-            val spinner = Spinner(this).apply {
-                background = GradientDrawable().apply {
-                    setColor(Color.parseColor("#0B101E"))
-                    cornerRadius = 25f
-                    setStroke(2, Color.parseColor("#00C6FF"))
-                }
-                setPopupBackgroundDrawable(ColorDrawable(Color.parseColor("#151C2C")))
-                layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { bottomMargin = 30 }
-            }
-
-            val adapter = object : ArrayAdapter<String>(this, android.R.layout.simple_spinner_dropdown_item, items) {
-                override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
-                    val view = super.getView(position, convertView, parent) as TextView
-                    view.setTextColor(Color.WHITE)
-                    view.setPadding(40, 35, 40, 35)
-                    return view
-                }
-                override fun getDropDownView(position: Int, convertView: View?, parent: ViewGroup): View {
-                    val view = super.getDropDownView(position, convertView, parent) as TextView
-                    view.setTextColor(Color.parseColor("#E2E8F0"))
-                    view.setBackgroundColor(Color.parseColor("#151C2C"))
-                    view.setPadding(50, 40, 50, 40)
-                    return view
-                }
-            }
-            spinner.adapter = adapter
-            spinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
-                override fun onItemSelected(p0: AdapterView<*>?, p1: View?, pos: Int, p3: Long) { onItemSelected(pos) }
-                override fun onNothingSelected(p0: AdapterView<*>?) {}
-            }
-            return spinner
-        }
-
+        // 2. API Key
         val apiKeyInput = EditText(this).apply {
             hint = "Enter Gemini API Key"
             setHintTextColor(Color.parseColor("#475569"))
@@ -178,82 +115,80 @@ class MainActivity : ComponentActivity() {
             textSize = 14f
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
             background = GradientDrawable().apply {
-                setColor(Color.parseColor("#0B101E"))
-                cornerRadius = 25f
-                setStroke(2, Color.parseColor("#475569"))
+                setColor(Color.parseColor("#151C2C"))
+                cornerRadius = 20f
+                setStroke(2, Color.parseColor("#2A344A"))
             }
-            setPadding(40, 35, 40, 35)
+            setPadding(30, 25, 30, 25)
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { bottomMargin = 20 }
         }
-        val apiKeyCard = createCardSection("1. Authentication", apiKeyInput)
 
-        val mediaLayout = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-        
-        val btnPickVideo = Button(this).apply {
-            text = "📁 Select Video File"
-            isAllCaps = false
-            setTextColor(Color.WHITE)
-            background = GradientDrawable().apply {
-                setColor(Color.parseColor("#2563EB"))
-                cornerRadius = 25f
-            }
-            setPadding(0, 35, 0, 35)
-            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { bottomMargin = 40 }
+        // 3. Spinners Row (Tone & Color)
+        val spinnerRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            weightSum = 2f
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { bottomMargin = 20 }
         }
-        btnPickVideo.setOnClickListener { pickVideoLauncher.launch("video/*") }
 
-        mediaLayout.addView(btnPickVideo)
-        mediaLayout.addView(TextView(this).apply { text = "Translation Tone:"; setTextColor(Color.parseColor("#94A3B8")); setPadding(10, 0, 0, 15) })
-        
-        val styleSpinner = createPlatinumSpinner(arrayOf("Standard (ပုံမှန်)", "Informal (အလွတ်သဘော)", "Movie Action (အက်ရှင်)", "Comedy (ဟာသ)")) { pos ->
-            selectedStyle = when(pos) {
-                1 -> "Informal and natural"
-                2 -> "Action movie style, dramatic"
-                3 -> "Comedic and funny"
-                else -> "Standard professional"
+        fun createSpinner(items: Array<String>, onItemSelected: (Int) -> Unit): Spinner {
+            val spinner = Spinner(this@MainActivity).apply {
+                background = GradientDrawable().apply {
+                    setColor(Color.parseColor("#151C2C"))
+                    cornerRadius = 20f
+                    setStroke(2, Color.parseColor("#2A344A"))
+                }
+                setPopupBackgroundDrawable(ColorDrawable(Color.parseColor("#151C2C")))
+                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply { marginEnd = 10; marginStart = 10 }
             }
+            spinner.adapter = object : ArrayAdapter<String>(this@MainActivity, android.R.layout.simple_spinner_dropdown_item, items) {
+                override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
+                    val view = super.getView(position, convertView, parent) as TextView
+                    view.setTextColor(Color.WHITE); view.textSize = 12f; view.setPadding(20, 20, 20, 20)
+                    return view
+                }
+                override fun getDropDownView(position: Int, convertView: View?, parent: ViewGroup): View {
+                    val view = super.getDropDownView(position, convertView, parent) as TextView
+                    view.setTextColor(Color.parseColor("#E2E8F0")); view.setBackgroundColor(Color.parseColor("#151C2C")); view.setPadding(30, 30, 30, 30)
+                    return view
+                }
+            }
+            spinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+                override fun onItemSelected(p0: AdapterView<*>?, p1: View?, pos: Int, p3: Long) { onItemSelected(pos) }
+                override fun onNothingSelected(p0: AdapterView<*>?) {}
+            }
+            return spinner
         }
-        mediaLayout.addView(styleSpinner)
 
-        mediaLayout.addView(TextView(this).apply { text = "Subtitle Color:"; setTextColor(Color.parseColor("#94A3B8")); setPadding(10, 10, 0, 15) })
-        val colorSpinner = createPlatinumSpinner(arrayOf("White (အဖြူ)", "Yellow (အဝါ)", "Green (အစိမ်း)", "Cyan (အပြာနု)")) { pos ->
-            selectedColor = when(pos) {
-                1 -> "#FFFF00"
-                2 -> "#00FF00"
-                3 -> "#00FFFF"
-                else -> "#FFFFFF"
-            }
-            if (::subtitleOverlay.isInitialized) {
-                subtitleOverlay.setTextColor(Color.parseColor(selectedColor))
-            }
+        val styleSpinner = createSpinner(arrayOf("Standard", "Informal", "Action", "Comedy")) { pos ->
+            selectedStyle = when(pos) { 1 -> "Informal"; 2 -> "Action"; 3 -> "Comedy"; else -> "Standard professional" }
         }
-        mediaLayout.addView(colorSpinner)
-        val mediaCard = createCardSection("2. Configuration", mediaLayout)
+        val colorSpinner = createSpinner(arrayOf("White", "Yellow", "Green", "Cyan")) { pos ->
+            selectedColor = when(pos) { 1 -> "#FFFF00"; 2 -> "#00FF00"; 3 -> "#00FFFF"; else -> "#FFFFFF" }
+            if (::subtitleOverlay.isInitialized) subtitleOverlay.setTextColor(Color.parseColor(selectedColor))
+        }
+        spinnerRow.addView(styleSpinner); spinnerRow.addView(colorSpinner)
 
-        previewContainer = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            visibility = View.GONE
-        }
-        
-        val frameLayout = FrameLayout(this).apply {
-            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 600).apply { bottomMargin = 30 }
-            background = GradientDrawable().apply { setColor(Color.BLACK); cornerRadius = 20f }
+        // 4. Preview Area (Weight = 1 အသုံးပြုထားသဖြင့် ကျန်ရှိသော Screen နေရာလွတ်အားလုံးကို အလိုလိုဖြည့်ပေးမည်)
+        val previewFrame = FrameLayout(this).apply {
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f).apply { bottomMargin = 20 }
+            background = GradientDrawable().apply { setColor(Color.BLACK); cornerRadius = 25f }
             clipToOutline = true
         }
-        
+
         videoView = VideoView(this).apply {
             layoutParams = FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT).apply { gravity = Gravity.CENTER }
         }
-        
+
         subtitleOverlay = TextView(this).apply {
             text = "Subtitle Preview\n(လက်ဖြင့်ရွှေ့နိုင်၊ ချုံ့ချဲ့နိုင်ပါသည်)"
             setTextColor(Color.WHITE)
-            textSize = 16f
+            textSize = 14f
             gravity = Gravity.CENTER
             setBackgroundColor(Color.parseColor("#99000000")) 
-            setPadding(30, 20, 30, 20)
+            setPadding(20, 15, 20, 15)
             layoutParams = FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT).apply {
                 gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
-                bottomMargin = 40
+                bottomMargin = 50
             }
         }
 
@@ -261,8 +196,7 @@ class MainActivity : ComponentActivity() {
             override fun onScale(detector: ScaleGestureDetector): Boolean {
                 scaleFactor *= detector.scaleFactor
                 scaleFactor = Math.max(0.5f, Math.min(scaleFactor, 3.0f))
-                subtitleOverlay.scaleX = scaleFactor
-                subtitleOverlay.scaleY = scaleFactor
+                subtitleOverlay.scaleX = scaleFactor; subtitleOverlay.scaleY = scaleFactor
                 return true
             }
         })
@@ -270,42 +204,33 @@ class MainActivity : ComponentActivity() {
         subtitleOverlay.setOnTouchListener { view, event ->
             scaleGestureDetector.onTouchEvent(event)
             when (event.actionMasked) {
-                MotionEvent.ACTION_DOWN -> {
-                    dX = view.x - event.rawX
-                    dY = view.y - event.rawY
-                }
+                MotionEvent.ACTION_DOWN -> { dX = view.x - event.rawX; dY = view.y - event.rawY }
                 MotionEvent.ACTION_MOVE -> {
-                    if (!scaleGestureDetector.isInProgress) {
-                        view.x = event.rawX + dX
-                        view.y = event.rawY + dY
-                    }
+                    if (!scaleGestureDetector.isInProgress) { view.x = event.rawX + dX; view.y = event.rawY + dY }
                 }
             }
             true
         }
-        
-        frameLayout.addView(videoView)
-        frameLayout.addView(subtitleOverlay)
-        
+
+        previewFrame.addView(videoView)
+        previewFrame.addView(subtitleOverlay)
+
+        // 5. Toggles Row (Sub ON / Box ON)
         val toggleRow = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             weightSum = 2f
-            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { bottomMargin = 20 }
         }
         
         val btnToggleSub = Button(this).apply {
-            text = "💬 Sub: ON"
-            isAllCaps = false
-            setTextColor(Color.WHITE)
-            background = GradientDrawable().apply { setColor(Color.parseColor("#334155")); cornerRadius = 20f }
-            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply { rightMargin = 10 }
+            text = "💬 Sub: ON"; isAllCaps = false; setTextColor(Color.WHITE); textSize = 12f
+            background = GradientDrawable().apply { setColor(Color.parseColor("#1E293B")); cornerRadius = 15f }
+            layoutParams = LinearLayout.LayoutParams(0, 100, 1f).apply { marginEnd = 10 }
         }
         val btnToggleBg = Button(this).apply {
-            text = "⬛ Box: ON"
-            isAllCaps = false
-            setTextColor(Color.WHITE)
-            background = GradientDrawable().apply { setColor(Color.parseColor("#334155")); cornerRadius = 20f }
-            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply { leftMargin = 10 }
+            text = "⬛ Box: ON"; isAllCaps = false; setTextColor(Color.WHITE); textSize = 12f
+            background = GradientDrawable().apply { setColor(Color.parseColor("#1E293B")); cornerRadius = 15f }
+            layoutParams = LinearLayout.LayoutParams(0, 100, 1f).apply { marginStart = 10 }
         }
         
         btnToggleSub.setOnClickListener {
@@ -320,202 +245,136 @@ class MainActivity : ComponentActivity() {
             btnToggleBg.text = if (isBgVisible) "⬛ Box: ON" else "⬛ Box: OFF"
             btnToggleBg.setTextColor(if (isBgVisible) Color.WHITE else Color.GRAY)
         }
-        
-        toggleRow.addView(btnToggleSub)
-        toggleRow.addView(btnToggleBg)
-        
-        previewContainer.addView(frameLayout)
-        previewContainer.addView(toggleRow)
-        
-        val previewCard = createCardSection("3. Live Preview (Drag & Zoom)", previewContainer)
+        toggleRow.addView(btnToggleSub); toggleRow.addView(btnToggleBg)
 
-        val statusLayout = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER }
+        // 6. Action Buttons Row
+        val actionRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            weightSum = 2f
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { bottomMargin = 15 }
+        }
+
+        val btnPickVideo = Button(this).apply {
+            text = "📁 Select Video"
+            isAllCaps = false; setTextColor(Color.WHITE)
+            background = GradientDrawable().apply { setColor(Color.parseColor("#2563EB")); cornerRadius = 20f }
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply { marginEnd = 10 }
+            setOnClickListener { pickVideoLauncher.launch("video/*") }
+        }
+
+        val btnGenerate = Button(this).apply {
+            text = "🚀 Generate SRT"
+            isAllCaps = false; setTextColor(Color.WHITE)
+            background = GradientDrawable(GradientDrawable.Orientation.TL_BR, intArrayOf(Color.parseColor("#00C6FF"), Color.parseColor("#0072FF"))).apply { cornerRadius = 20f }
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply { marginStart = 10 }
+        }
+        actionRow.addView(btnPickVideo); actionRow.addView(btnGenerate)
+
+        // 7. Export Video Button
+        btnExportVideo = Button(this).apply {
+            text = "🎬 Export Video (Burn-in)"
+            isAllCaps = false; setTextColor(Color.WHITE); setTypeface(null, Typeface.BOLD)
+            background = GradientDrawable(GradientDrawable.Orientation.TL_BR, intArrayOf(Color.parseColor("#F59E0B"), Color.parseColor("#D97706"))).apply { cornerRadius = 20f }
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { bottomMargin = 15 }
+            visibility = View.GONE
+        }
+
+        // 8. Status Text
         statusText = TextView(this).apply {
-            text = "Waiting to start..."
+            text = "Ready to start..."
             setTextColor(Color.parseColor("#94A3B8"))
             gravity = Gravity.CENTER
-            setPadding(0, 20, 0, 40)
-        }
-        
-        val btnGenerate = Button(this).apply {
-            text = "🚀 1. Generate SRT"
-            isAllCaps = false
-            textSize = 16f
-            setTypeface(null, Typeface.BOLD)
-            setTextColor(Color.WHITE)
-            background = GradientDrawable(
-                GradientDrawable.Orientation.TL_BR,
-                intArrayOf(Color.parseColor("#00C6FF"), Color.parseColor("#0072FF"))
-            ).apply { cornerRadius = 25f }
-            setPadding(0, 40, 0, 40)
-            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { bottomMargin = 20 }
-        }
-
-        val btnExportVideo = Button(this).apply {
-            text = "🎬 2. Export Video (Burn-in)"
-            isAllCaps = false
-            textSize = 16f
-            setTypeface(null, Typeface.BOLD)
-            setTextColor(Color.WHITE)
-            background = GradientDrawable(
-                GradientDrawable.Orientation.TL_BR,
-                intArrayOf(Color.parseColor("#F59E0B"), Color.parseColor("#D97706"))
-            ).apply { cornerRadius = 25f }
-            setPadding(0, 40, 0, 40)
+            textSize = 12f
             layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
-            visibility = View.GONE
         }
 
         btnGenerate.setOnClickListener {
             val apiKey = apiKeyInput.text.toString().trim()
-            if (apiKey.isEmpty()) {
-                statusText.text = "⚠️ API Key ထည့်ပေးပါ!"
-                statusText.setTextColor(Color.parseColor("#EF4444"))
-                return@setOnClickListener
-            }
-            if (selectedVideoUri == null) {
-                statusText.text = "⚠️ Video အရင်ရွေးပေးပါ!"
+            if (apiKey.isEmpty() || selectedVideoUri == null) {
+                statusText.text = "⚠️ API Key နှင့် Video ထည့်ပေးပါ!"
                 statusText.setTextColor(Color.parseColor("#EF4444"))
                 return@setOnClickListener
             }
 
-            btnGenerate.isEnabled = false
-            btnGenerate.alpha = 0.5f
-            btnExportVideo.visibility = View.GONE
+            btnGenerate.isEnabled = false; btnGenerate.alpha = 0.5f; btnExportVideo.visibility = View.GONE
 
             CoroutineScope(Dispatchers.IO).launch {
                 try {
                     val audioFile = File(cacheDir, "extracted_audio.m4a")
                     val extractSuccess = extractAudioFromVideo(selectedVideoUri!!, audioFile.absolutePath) { progress ->
-                        withContext(Dispatchers.Main) {
-                            statusText.text = "⏳ Extracting Audio... ($progress%)"
-                            statusText.setTextColor(Color.parseColor("#FBBF24"))
-                        }
+                        withContext(Dispatchers.Main) { statusText.text = "⏳ Extracting Audio... ($progress%)"; statusText.setTextColor(Color.parseColor("#FBBF24")) }
                     }
 
                     if (!extractSuccess || !audioFile.exists()) {
-                        withContext(Dispatchers.Main) {
-                            statusText.text = "❌ အသံဆွဲထုတ်ခြင်း မအောင်မြင်ပါ။"
-                            statusText.setTextColor(Color.parseColor("#EF4444"))
-                            btnGenerate.isEnabled = true
-                            btnGenerate.alpha = 1.0f
-                        }
+                        withContext(Dispatchers.Main) { statusText.text = "❌ Audio ထုတ်မရပါ"; btnGenerate.isEnabled = true; btnGenerate.alpha = 1.0f }
                         return@launch
                     }
 
-                    withContext(Dispatchers.Main) {
-                        statusText.text = "🌐 AI Translating ($selectedStyle)...\nPlease wait."
-                    }
+                    withContext(Dispatchers.Main) { statusText.text = "🌐 AI Translating... Please wait." }
 
                     val bytes = audioFile.readBytes()
                     val base64Audio = Base64.encodeToString(bytes, Base64.NO_WRAP)
-
-                    val client = OkHttpClient.Builder()
-                        .connectTimeout(0, TimeUnit.SECONDS)
-                        .readTimeout(0, TimeUnit.SECONDS)
-                        .writeTimeout(0, TimeUnit.SECONDS)
-                        .build()
-
+                    val client = OkHttpClient.Builder().connectTimeout(0, TimeUnit.SECONDS).readTimeout(0, TimeUnit.SECONDS).writeTimeout(0, TimeUnit.SECONDS).build()
                     val jsonMediaType = "application/json; charset=utf-8".toMediaTypeOrNull()
                     
                     val geminiJson = JSONObject().apply {
                         put("contents", org.json.JSONArray().apply {
                             put(JSONObject().apply {
                                 put("parts", org.json.JSONArray().apply {
-                                    put(JSONObject().apply {
-                                        put("text", "You are an expert subtitler. Listen to this audio and generate a perfectly timed SRT file. Translate the spoken English directly into Myanmar (Burmese) language using a $selectedStyle tone. Return ONLY the raw SRT format text starting with block 1. Do NOT include markdown blocks like ```srt.")
-                                    })
-                                    put(JSONObject().apply {
-                                        put("inline_data", JSONObject().apply {
-                                            put("mime_type", "audio/mp4")
-                                            put("data", base64Audio)
-                                        })
-                                    })
+                                    put(JSONObject().apply { put("text", "You are an expert subtitler. Listen and generate a perfectly timed SRT file. Translate directly into Myanmar (Burmese) language using a $selectedStyle tone. Return ONLY raw SRT text.") })
+                                    put(JSONObject().apply { put("inline_data", JSONObject().apply { put("mime_type", "audio/mp4"); put("data", base64Audio) }) })
                                 })
                             })
                         })
                     }
 
-                    // ဤနေရာတွင် Gemini 3.5 Flash Lite သို့ ပြောင်းလဲချိတ်ဆက်ထားပါသည်
-                    val cleanedApiKey = apiKey.trim()
-                    val domain1 = "generativelanguage"
-                    val domain2 = ".googleapis.com"
-                    val urlStr = "https://" + domain1 + domain2 + "/v1beta/models/gemini-3.5-flash-lite:generateContent?key=" + cleanedApiKey
-                    
+                    // Gemini 3.5 Flash Lite အသုံးပြုထားပါသည်
+                    val urlStr = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key=${apiKey.trim()}"
                     val request = Request.Builder().url(urlStr).post(geminiJson.toString().toRequestBody(jsonMediaType)).build()
-
                     val response = client.newCall(request).execute()
                     val responseStr = response.body?.string()
 
                     if (response.isSuccessful && responseStr != null) {
                         try {
-                            val root = JSONObject(responseStr)
-                            var extractedText = root.getJSONArray("candidates")
-                                .getJSONObject(0)
-                                .getJSONObject("content")
-                                .getJSONArray("parts")
-                                .getJSONObject(0)
-                                .getString("text")
-                            
+                            var extractedText = JSONObject(responseStr).getJSONArray("candidates").getJSONObject(0).getJSONObject("content").getJSONArray("parts").getJSONObject(0).getString("text")
                             extractedText = extractedText.replace("```srt", "").replace("```", "").trim()
-                            
-                            if (selectedColor != "#FFFFFF") {
-                                extractedText = applyColorToSrt(extractedText, selectedColor)
-                            }
-                            
+                            if (selectedColor != "#FFFFFF") extractedText = applyColorToSrt(extractedText, selectedColor)
                             generatedSrtContent = extractedText
 
                             withContext(Dispatchers.Main) {
-                                statusText.text = "✅ ပြီးစီးပါပြီ! SRT ဖိုင်ကို အရင်သိမ်းဆည်းပါ။"
+                                statusText.text = "✅ ပြီးစီးပါပြီ! ဗီဒီယို Export ထုတ်နိုင်ပါပြီ။"
                                 statusText.setTextColor(Color.parseColor("#4ADE80"))
                                 saveSrtLauncher.launch("gemini_myanmar.srt")
-                                subtitleOverlay.text = "🎉 ဖန်တီးမှု ပြီးစီးပါပြီ!\n(အောက်ပါခလုတ်ဖြင့် Video ထုတ်နိုင်ပါပြီ)"
                                 btnExportVideo.visibility = View.VISIBLE
                             }
                         } catch (e: Exception) {
-                            withContext(Dispatchers.Main) {
-                                statusText.text = "❌ Gemini မှ အဖြေမရရှိပါ။"
-                                statusText.setTextColor(Color.parseColor("#EF4444"))
-                            }
+                            withContext(Dispatchers.Main) { statusText.text = "❌ Gemini Error"; statusText.setTextColor(Color.parseColor("#EF4444")) }
                         }
                     } else {
-                        val errorMsg = try { JSONObject(responseStr ?: "").getJSONObject("error").getString("message") } catch (e: Exception) { "Network Error" }
-                        withContext(Dispatchers.Main) {
-                            statusText.text = "❌ API Error: $errorMsg"
-                            statusText.setTextColor(Color.parseColor("#EF4444"))
-                        }
+                        withContext(Dispatchers.Main) { statusText.text = "❌ API Error / High Demand"; statusText.setTextColor(Color.parseColor("#EF4444")) }
                     }
                     audioFile.delete()
                 } catch (e: Exception) {
-                    withContext(Dispatchers.Main) {
-                        statusText.text = "❌ Error: ${e.message}"
-                        statusText.setTextColor(Color.parseColor("#EF4444"))
-                    }
+                    withContext(Dispatchers.Main) { statusText.text = "❌ Error: ${e.message}" }
                 } finally {
-                    withContext(Dispatchers.Main) {
-                        btnGenerate.isEnabled = true
-                        btnGenerate.alpha = 1.0f
-                    }
+                    withContext(Dispatchers.Main) { btnGenerate.isEnabled = true; btnGenerate.alpha = 1.0f }
                 }
             }
         }
 
-        // FFmpeg Export Logic
+        // FFmpeg Export Logic (Crash Fix အပြည့်အစုံ ပါဝင်သည်)
         btnExportVideo.setOnClickListener {
             if (generatedSrtContent.isEmpty() || selectedVideoUri == null) return@setOnClickListener
             
-            btnExportVideo.isEnabled = false
-            btnExportVideo.text = "⏳ Rendering Video... (ကြာနိုင်ပါသည်)"
-            statusText.text = "⚙️ Video ပေါ်သို့ စာတန်းထိုးကပ်နေပါသည်...\nဖုန်းအားမပိတ်ဘဲ စောင့်ပေးပါ။"
+            btnExportVideo.isEnabled = false; btnExportVideo.text = "⏳ Rendering Video..."
+            statusText.text = "⚙️ Video အသစ်ထုတ်နေပါသည်...\nApp ကို မပိတ်ဘဲ စောင့်ပေးပါ။"
             statusText.setTextColor(Color.parseColor("#FBBF24"))
 
             CoroutineScope(Dispatchers.IO).launch {
                 try {
                     val inputVideoFile = File(cacheDir, "input_video.mp4")
                     contentResolver.openInputStream(selectedVideoUri!!)?.use { input ->
-                        FileOutputStream(inputVideoFile).use { output ->
-                            input.copyTo(output)
-                        }
+                        FileOutputStream(inputVideoFile).use { output -> input.copyTo(output) }
                     }
 
                     val srtFile = File(cacheDir, "temp_sub.srt")
@@ -525,9 +384,10 @@ class MainActivity : ComponentActivity() {
                     if (outputVideoFile.exists()) outputVideoFile.delete()
 
                     val boxStyle = if (isBgVisible) "BorderStyle=4,BackColour=&H80000000," else ""
-                    val srtPath = srtFile.absolutePath.replace("'", "\\\\'")
+                    val safeSrtPath = srtFile.absolutePath
                     
-                    val cmd = "-y -i \"${inputVideoFile.absolutePath}\" -vf \"subtitles='${srtPath}':fontsdir=/system/fonts:force_style='${boxStyle}Fontsize=18'\" -c:v libx264 -preset ultrafast -threads 2 -c:a copy \"${outputVideoFile.absolutePath}\""
+                    // Native Crash မဖြစ်စေရန် Font လမ်းကြောင်း နှင့် RAM သက်သာစေရန် ultrafast အသုံးပြုထားသည်
+                    val cmd = "-y -i \"$inputVideoFile\" -vf \"subtitles='$safeSrtPath':force_style='${boxStyle}Fontsize=18'\" -c:v libx264 -preset ultrafast -threads 2 -c:a copy \"$outputVideoFile\""
 
                     val session = FFmpegKit.execute(cmd)
                     
@@ -535,70 +395,53 @@ class MainActivity : ComponentActivity() {
                         var isSaved = false
                         try {
                             val values = ContentValues().apply {
-                                put(MediaStore.Video.Media.DISPLAY_NAME, "AutoSRT_Export_${System.currentTimeMillis()}.mp4")
+                                put(MediaStore.Video.Media.DISPLAY_NAME, "AutoSRT_${System.currentTimeMillis()}.mp4")
                                 put(MediaStore.Video.Media.MIME_TYPE, "video/mp4")
                                 put(MediaStore.Video.Media.RELATIVE_PATH, Environment.DIRECTORY_MOVIES + "/AutoSRT")
                             }
-                            
                             val uri = contentResolver.insert(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, values)
                             if (uri != null) {
-                                contentResolver.openOutputStream(uri)?.use { out ->
-                                    outputVideoFile.inputStream().use { it.copyTo(out) }
-                                }
+                                contentResolver.openOutputStream(uri)?.use { out -> outputVideoFile.inputStream().use { it.copyTo(out) } }
                                 isSaved = true
                             }
-                        } catch (e: Exception) {
-                            e.printStackTrace()
-                        }
+                        } catch (e: Exception) { e.printStackTrace() }
 
                         withContext(Dispatchers.Main) {
                             if (isSaved) {
-                                statusText.text = "✅ အောင်မြင်ပါသည်!\nဗီဒီယိုကို ဖုန်း Gallery (Movies/AutoSRT) ထဲတွင် ကြည့်နိုင်ပါပြီ။"
+                                statusText.text = "✅ အောင်မြင်ပါသည်! Gallery (Movies/AutoSRT) တွင် ကြည့်ပါ။"
                                 statusText.setTextColor(Color.parseColor("#4ADE80"))
                             } else {
-                                statusText.text = "❌ ဖိုင်သိမ်းရန် ခွင့်ပြုချက် လိုအပ်နေပါသည်။"
-                                statusText.setTextColor(Color.parseColor("#EF4444"))
+                                statusText.text = "❌ ဖိုင်သိမ်းရန် Permission လိုအပ်ပါသည်။"
                             }
                         }
                     } else {
                         withContext(Dispatchers.Main) {
-                            statusText.text = "❌ Rendering Failed! Video မှာ ကြီးမား/ရှုပ်ထွေးလွန်းနေပါသည်။"
+                            statusText.text = "❌ Rendering Failed! (FFmpeg Error)"
                             statusText.setTextColor(Color.parseColor("#EF4444"))
                         }
                     }
 
-                    inputVideoFile.delete()
-                    srtFile.delete()
-                    outputVideoFile.delete()
+                    inputVideoFile.delete(); srtFile.delete(); outputVideoFile.delete()
 
                 } catch (e: Exception) {
-                    withContext(Dispatchers.Main) {
-                        statusText.text = "❌ Error: ${e.message}"
-                        statusText.setTextColor(Color.parseColor("#EF4444"))
-                    }
+                    withContext(Dispatchers.Main) { statusText.text = "❌ Error: ${e.message}" }
                 } finally {
-                    withContext(Dispatchers.Main) {
-                        btnExportVideo.isEnabled = true
-                        btnExportVideo.text = "🎬 2. Export Video (Burn-in)"
-                    }
+                    withContext(Dispatchers.Main) { btnExportVideo.isEnabled = true; btnExportVideo.text = "🎬 Export Video (Burn-in)" }
                 }
             }
         }
 
-        statusLayout.addView(statusText)
-        statusLayout.addView(btnGenerate)
-        statusLayout.addView(btnExportVideo)
-        val actionCard = createCardSection("4. Action", statusLayout)
-
+        // View များကို Main Layout အတွင်းသို့ အစီအစဉ်တကျ ထည့်သွင်းခြင်း
         mainLayout.addView(titleText)
-        mainLayout.addView(subTitleText)
-        mainLayout.addView(apiKeyCard)
-        mainLayout.addView(mediaCard)
-        mainLayout.addView(previewCard) 
-        mainLayout.addView(actionCard)
+        mainLayout.addView(apiKeyInput)
+        mainLayout.addView(spinnerRow)
+        mainLayout.addView(previewFrame) // ဤနေရာတွင် Weight=1 ကြောင့် Screen အပြည့်ဆွဲဆန့်ပေးမည်
+        mainLayout.addView(toggleRow)
+        mainLayout.addView(actionRow)
+        mainLayout.addView(btnExportVideo)
+        mainLayout.addView(statusText)
 
-        scrollView.addView(mainLayout)
-        setContentView(scrollView)
+        setContentView(mainLayout)
     }
 
     private fun applyColorToSrt(srtContent: String, colorHex: String): String {
@@ -617,17 +460,12 @@ class MainActivity : ComponentActivity() {
     private suspend fun extractAudioFromVideo(videoUri: Uri, outputPath: String, onProgress: suspend (Int) -> Unit): Boolean {
         val extractor = MediaExtractor()
         try {
-            contentResolver.openFileDescriptor(videoUri, "r")?.fileDescriptor?.let {
-                extractor.setDataSource(it)
-            } ?: return false
+            contentResolver.openFileDescriptor(videoUri, "r")?.fileDescriptor?.let { extractor.setDataSource(it) } ?: return false
 
             var audioTrackIndex = -1
             for (i in 0 until extractor.trackCount) {
                 val format = extractor.getTrackFormat(i)
-                val mime = format.getString(MediaFormat.KEY_MIME)
-                if (mime?.startsWith("audio/") == true) {
-                    audioTrackIndex = i; break
-                }
+                if (format.getString(MediaFormat.KEY_MIME)?.startsWith("audio/") == true) { audioTrackIndex = i; break }
             }
             if (audioTrackIndex == -1) return false
 
@@ -639,13 +477,7 @@ class MainActivity : ComponentActivity() {
             val muxerTrackIndex = muxer.addTrack(format)
             muxer.start()
 
-            val bufferSize = try {
-                val size = format.getInteger(MediaFormat.KEY_MAX_INPUT_SIZE)
-                if (size > 0) size else 1024 * 1024
-            } catch (e: Exception) {
-                1024 * 1024
-            }
-            
+            val bufferSize = try { val size = format.getInteger(MediaFormat.KEY_MAX_INPUT_SIZE); if (size > 0) size else 1024 * 1024 } catch (e: Exception) { 1024 * 1024 }
             val buffer = ByteBuffer.allocate(bufferSize)
             val bufferInfo = MediaCodec.BufferInfo()
             var lastProgress = -1
@@ -656,21 +488,14 @@ class MainActivity : ComponentActivity() {
                 bufferInfo.offset = 0; bufferInfo.size = sampleSize; bufferInfo.flags = extractor.sampleFlags; bufferInfo.presentationTimeUs = extractor.sampleTime
                 if (durationUs > 0) {
                     val progress = ((bufferInfo.presentationTimeUs.toDouble() / durationUs.toDouble()) * 100).toInt()
-                    if (progress > lastProgress && progress <= 100) {
-                        onProgress(progress)
-                        lastProgress = progress
-                    }
+                    if (progress > lastProgress && progress <= 100) { onProgress(progress); lastProgress = progress }
                 }
                 muxer.writeSampleData(muxerTrackIndex, buffer, bufferInfo)
                 extractor.advance()
             }
             
-            onProgress(100)
-            muxer.stop(); muxer.release(); extractor.release()
+            onProgress(100); muxer.stop(); muxer.release(); extractor.release()
             return true
-        } catch (e: Exception) {
-            e.printStackTrace()
-            return false
-        }
+        } catch (e: Exception) { e.printStackTrace(); return false }
     }
 }
