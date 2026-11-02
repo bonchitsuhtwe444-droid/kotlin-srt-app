@@ -71,21 +71,11 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private val saveSrtLauncher = registerForActivityResult(ActivityResultContracts.CreateDocument("application/x-subrip")) { uri: Uri? ->
-        if (uri != null) {
-            contentResolver.openOutputStream(uri)?.use { outputStream ->
-                outputStream.write(generatedSrtContent.toByteArray())
-            }
-            statusText.text = "🎉 SRT ဖိုင်ကို သိမ်းဆည်းပြီးပါပြီ။"
-            statusText.setTextColor(Color.parseColor("#38BDF8"))
-        }
-    }
-
     @SuppressLint("ClickableViewAccessibility")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Screen တစ်ခုလုံးကို တန့်နေစေရန် (Scroll မပါဘဲ) Main Layout တည်ဆောက်ခြင်း
+        // Screen ကို အပေါ်အောက် ဆွဲစရာမလိုဘဲ တန့်နေစေရန် Main Layout တည်ဆောက်ခြင်း
         val mainLayout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setBackgroundColor(Color.parseColor("#0B101E")) 
@@ -119,8 +109,9 @@ class MainActivity : ComponentActivity() {
             layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { bottomMargin = 20 }
         }
 
-        // 3. (CRASH FIX) Preview Elements များကို Spinner မတိုင်မီ ကြိုတင်တည်ဆောက်ခြင်း
+        // 3. Preview Elements
         val previewFrame = FrameLayout(this).apply {
+            // weight 1f အသုံးပြုထားသဖြင့် 16:9 တွင်မဆို Screen ကို အလိုလိုချဲ့ပေးမည်
             layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f).apply { bottomMargin = 20 }
             background = GradientDrawable().apply { setColor(Color.BLACK); cornerRadius = 25f }
             clipToOutline = true
@@ -207,7 +198,7 @@ class MainActivity : ComponentActivity() {
         }
         val colorSpinner = createSpinner(arrayOf("White", "Yellow", "Green", "Cyan")) { pos ->
             selectedColor = when(pos) { 1 -> "#FFFF00"; 2 -> "#00FF00"; 3 -> "#00FFFF"; else -> "#FFFFFF" }
-            subtitleOverlay.setTextColor(Color.parseColor(selectedColor)) // ယခုအခါ Crash မဖြစ်တော့ပါ
+            subtitleOverlay.setTextColor(Color.parseColor(selectedColor))
         }
         spinnerRow.addView(styleSpinner); spinnerRow.addView(colorSpinner)
 
@@ -221,12 +212,12 @@ class MainActivity : ComponentActivity() {
         val btnToggleSub = Button(this).apply {
             text = "💬 Sub: ON"; isAllCaps = false; setTextColor(Color.WHITE); textSize = 12f
             background = GradientDrawable().apply { setColor(Color.parseColor("#1E293B")); cornerRadius = 15f }
-            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply { marginEnd = 10 }
+            layoutParams = LinearLayout.LayoutParams(0, 100, 1f).apply { marginEnd = 10 }
         }
         val btnToggleBg = Button(this).apply {
             text = "⬛ Box: ON"; isAllCaps = false; setTextColor(Color.WHITE); textSize = 12f
             background = GradientDrawable().apply { setColor(Color.parseColor("#1E293B")); cornerRadius = 15f }
-            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply { marginStart = 10 }
+            layoutParams = LinearLayout.LayoutParams(0, 100, 1f).apply { marginStart = 10 }
         }
         
         btnToggleSub.setOnClickListener {
@@ -324,7 +315,6 @@ class MainActivity : ComponentActivity() {
                         })
                     }
 
-                    // Markdown Error မဖြစ်စေရန် Link ကို ခွဲရေးထားပါသည်
                     val cleanedApiKey = apiKey.trim()
                     val domain1 = "generativelanguage"
                     val domain2 = ".googleapis.com"
@@ -341,11 +331,19 @@ class MainActivity : ComponentActivity() {
                             if (selectedColor != "#FFFFFF") extractedText = applyColorToSrt(extractedText, selectedColor)
                             generatedSrtContent = extractedText
 
+                            // --- AUTO SAVE SRT (No Dialog, No Crash) ---
+                            val isSaved = autoSaveTextFile("AutoSRT_${System.currentTimeMillis()}.srt", generatedSrtContent)
+
                             withContext(Dispatchers.Main) {
-                                statusText.text = "✅ ပြီးစီးပါပြီ! ဗီဒီယို Export ထုတ်နိုင်ပါပြီ။"
-                                statusText.setTextColor(Color.parseColor("#4ADE80"))
-                                saveSrtLauncher.launch("gemini_myanmar.srt")
-                                btnExportVideo.visibility = View.VISIBLE
+                                if (isSaved) {
+                                    statusText.text = "✅ ပြီးစီးပါပြီ! SRT အား Downloads/AutoSRT တွင် အလိုလိုသိမ်းပေးလိုက်ပါသည်။"
+                                    statusText.setTextColor(Color.parseColor("#4ADE80"))
+                                    btnExportVideo.visibility = View.VISIBLE
+                                } else {
+                                    statusText.text = "⚠️ SRT ထုတ်ပြီးသော်လည်း ဖုန်းထဲသိမ်း၍မရပါ။"
+                                    statusText.setTextColor(Color.parseColor("#F59E0B"))
+                                    btnExportVideo.visibility = View.VISIBLE
+                                }
                             }
                         } catch (e: Exception) {
                             withContext(Dispatchers.Main) { statusText.text = "❌ Gemini Error"; statusText.setTextColor(Color.parseColor("#EF4444")) }
@@ -372,12 +370,8 @@ class MainActivity : ComponentActivity() {
 
             CoroutineScope(Dispatchers.IO).launch {
                 try {
-                    // (CRASH FIX) Native FFmpeg Font Error မတက်စေရန် ဤနေရာတွင်သာ လုံခြုံစွာ ခေါ်ယူထားသည်
-                    try {
-                        FFmpegKitConfig.setFontDirectory(this@MainActivity, "/system/fonts", emptyMap<String, String>())
-                    } catch (e: Exception) {
-                        e.printStackTrace()
-                    }
+                    // Safe Font Loading to prevent native crashes
+                    try { FFmpegKitConfig.setFontDirectory(this@MainActivity, "/system/fonts", emptyMap<String, String>()) } catch (e: Exception) { e.printStackTrace() }
 
                     val inputVideoFile = File(cacheDir, "input_video.mp4")
                     contentResolver.openInputStream(selectedVideoUri!!)?.use { input ->
@@ -393,31 +387,21 @@ class MainActivity : ComponentActivity() {
                     val boxStyle = if (isBgVisible) "BorderStyle=4,BackColour=&H80000000," else ""
                     val safeSrtPath = srtFile.absolutePath.replace("'", "\\\\'")
                     
-                    val cmd = "-y -i \"$inputVideoFile\" -vf \"subtitles='$safeSrtPath':fontsdir=/system/fonts:force_style='${boxStyle}Fontsize=18'\" -c:v libx264 -preset ultrafast -threads 2 -c:a copy \"$outputVideoFile\""
+                    val cmd = "-y -i \"$inputVideoFile\" -vf \"subtitles='$safeSrtPath':force_style='${boxStyle}Fontsize=18'\" -c:v libx264 -preset ultrafast -threads 2 -c:a copy \"$outputVideoFile\""
 
                     val session = FFmpegKit.execute(cmd)
                     
                     if (ReturnCode.isSuccess(session.returnCode)) {
-                        var isSaved = false
-                        try {
-                            val values = ContentValues().apply {
-                                put(MediaStore.Video.Media.DISPLAY_NAME, "AutoSRT_${System.currentTimeMillis()}.mp4")
-                                put(MediaStore.Video.Media.MIME_TYPE, "video/mp4")
-                                put(MediaStore.Video.Media.RELATIVE_PATH, Environment.DIRECTORY_MOVIES + "/AutoSRT")
-                            }
-                            val uri = contentResolver.insert(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, values)
-                            if (uri != null) {
-                                contentResolver.openOutputStream(uri)?.use { out -> outputVideoFile.inputStream().use { it.copyTo(out) } }
-                                isSaved = true
-                            }
-                        } catch (e: Exception) { e.printStackTrace() }
+                        // --- AUTO SAVE VIDEO (No Dialog, No Crash) ---
+                        val isSaved = autoSaveVideoFile("AutoSRT_${System.currentTimeMillis()}.mp4", outputVideoFile)
 
                         withContext(Dispatchers.Main) {
                             if (isSaved) {
-                                statusText.text = "✅ အောင်မြင်ပါသည်! Gallery (Movies/AutoSRT) တွင် ကြည့်ပါ။"
+                                statusText.text = "✅ အောင်မြင်ပါသည်! ဗီဒီယိုအား Movies/AutoSRT တွင် အလိုလိုသိမ်းပေးလိုက်ပါသည်။"
                                 statusText.setTextColor(Color.parseColor("#4ADE80"))
                             } else {
                                 statusText.text = "❌ ဖိုင်သိမ်းရန် Permission လိုအပ်ပါသည်။"
+                                statusText.setTextColor(Color.parseColor("#EF4444"))
                             }
                         }
                     } else {
@@ -427,7 +411,8 @@ class MainActivity : ComponentActivity() {
                         }
                     }
 
-                    inputVideoFile.delete(); srtFile.delete(); outputVideoFile.delete()
+                    // Clean up caches safely
+                    try { inputVideoFile.delete(); srtFile.delete(); outputVideoFile.delete() } catch(e: Exception){}
 
                 } catch (e: Exception) {
                     withContext(Dispatchers.Main) { statusText.text = "❌ Error: ${e.message}" }
@@ -437,7 +422,7 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        // View များကို Main Layout အတွင်းသို့ အစီအစဉ်တကျ ထည့်သွင်းခြင်း
+        // Views အားလုံးကို Layout အတွင်း ထည့်သွင်းခြင်း
         mainLayout.addView(titleText)
         mainLayout.addView(apiKeyInput)
         mainLayout.addView(spinnerRow)
@@ -448,6 +433,45 @@ class MainActivity : ComponentActivity() {
         mainLayout.addView(statusText)
 
         setContentView(mainLayout)
+    }
+
+    // --- AUTO SAVE FUNCTIONS (CRASH-FREE) ---
+    private fun autoSaveTextFile(fileName: String, content: String): Boolean {
+        return try {
+            val values = ContentValues().apply {
+                put(MediaStore.MediaColumns.DISPLAY_NAME, fileName)
+                put(MediaStore.MediaColumns.MIME_TYPE, "application/x-subrip")
+                put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS + "/AutoSRT")
+            }
+            val uri = contentResolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
+            if (uri != null) {
+                contentResolver.openOutputStream(uri)?.use { it.write(content.toByteArray()) }
+                true
+            } else false
+        } catch (e: Exception) {
+            e.printStackTrace()
+            false
+        }
+    }
+
+    private fun autoSaveVideoFile(fileName: String, videoFile: File): Boolean {
+        return try {
+            val values = ContentValues().apply {
+                put(MediaStore.Video.Media.DISPLAY_NAME, fileName)
+                put(MediaStore.Video.Media.MIME_TYPE, "video/mp4")
+                put(MediaStore.Video.Media.RELATIVE_PATH, Environment.DIRECTORY_MOVIES + "/AutoSRT")
+            }
+            val uri = contentResolver.insert(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, values)
+            if (uri != null) {
+                contentResolver.openOutputStream(uri)?.use { out ->
+                    videoFile.inputStream().use { it.copyTo(out) }
+                }
+                true
+            } else false
+        } catch (e: Exception) {
+            e.printStackTrace()
+            false
+        }
     }
 
     private fun applyColorToSrt(srtContent: String, colorHex: String): String {
