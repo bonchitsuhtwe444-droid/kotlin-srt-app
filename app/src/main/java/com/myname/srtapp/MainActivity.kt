@@ -149,7 +149,6 @@ class MainActivity : ComponentActivity() {
         }
         styleSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
             override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
-                // ပြင်ဆင်ချက် - စာသားအရောင်ကို အမည်းရောင်ပြောင်းပေးထားသည်
                 if (view is TextView) view.setTextColor(Color.BLACK)
                 selectedStyle = when(position) {
                     1 -> "Informal and natural"
@@ -170,7 +169,6 @@ class MainActivity : ComponentActivity() {
         }
         colorSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
             override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
-                // ပြင်ဆင်ချက် - စာသားအရောင်ကို အမည်းရောင်ပြောင်းပေးထားသည်
                 if (view is TextView) view.setTextColor(Color.BLACK)
                 selectedColor = when(position) {
                     1 -> "#FFFF00"
@@ -280,10 +278,8 @@ class MainActivity : ComponentActivity() {
                         })
                     }
 
-                    // ပြင်ဆင်ချက် - URL တွင် Markdown Error မတက်စေရန် ခွဲရေးပေးထားပြီး Gemini 3.8 ကို ထည့်ထားပါသည်
-                    val baseUrl = "[https://generativelanguage.googleapis.com](https://generativelanguage.googleapis.com)"
-                    val endpoint = "/v1beta/models/gemini-3.8-flash:generateContent?key="
-                    val urlStr = "https://" + "generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=" + cleanedApiKey
+                    val cleanedApiKey = apiKey
+                    val urlStr = "https://" + "[generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=](https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=)" + cleanedApiKey
                     
                     val request = Request.Builder().url(urlStr).post(geminiJson.toString().toRequestBody(jsonMediaType)).build()
 
