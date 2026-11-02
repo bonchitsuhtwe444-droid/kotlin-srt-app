@@ -499,7 +499,7 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        // FFmpeg Export Logic (Crash Fix)
+        // FFmpeg Export Logic
         btnExportVideo.setOnClickListener {
             if (generatedSrtContent.isEmpty() || selectedVideoUri == null) return@setOnClickListener
             
@@ -638,8 +638,15 @@ class MainActivity : ComponentActivity() {
             val muxerTrackIndex = muxer.addTrack(format)
             muxer.start()
 
-            val bufferSize = format.getInteger(MediaFormat.KEY_MAX_INPUT_SIZE).takeIf { it > 0 } > 0 ?: (1024 * 1024)
-            val buffer = ByteBuffer.allocate(bufferSize.let { if (it is Int) it else 1024 * 1024 })
+            // ပုံထဲက Error ကို ဤနေရာတွင် ဖြေရှင်းထားပါသည်
+            val bufferSize = try {
+                val size = format.getInteger(MediaFormat.KEY_MAX_INPUT_SIZE)
+                if (size > 0) size else 1024 * 1024
+            } catch (e: Exception) {
+                1024 * 1024
+            }
+            
+            val buffer = ByteBuffer.allocate(bufferSize)
             val bufferInfo = MediaCodec.BufferInfo()
             var lastProgress = -1
 
