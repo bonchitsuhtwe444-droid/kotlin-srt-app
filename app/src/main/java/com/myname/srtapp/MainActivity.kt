@@ -75,6 +75,13 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        // [Crash Fix 1] App စပွင့်ကတည်းက Font များကို အသင့်ပြင်ထားခြင်း
+        try {
+            FFmpegKitConfig.setFontDirectory(this, "/system/fonts", null)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+
         val mainLayout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setBackgroundColor(Color.parseColor("#0B101E")) 
@@ -105,50 +112,6 @@ class MainActivity : ComponentActivity() {
             setPadding(30, 25, 30, 25)
             layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { bottomMargin = 20 }
         }
-
-        val spinnerRow = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            weightSum = 2f
-            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { bottomMargin = 20 }
-        }
-
-        fun createSpinner(items: Array<String>, onItemSelected: (Int) -> Unit): Spinner {
-            val spinner = Spinner(this@MainActivity).apply {
-                background = GradientDrawable().apply {
-                    setColor(Color.parseColor("#151C2C"))
-                    cornerRadius = 20f
-                    setStroke(2, Color.parseColor("#2A344A"))
-                }
-                setPopupBackgroundDrawable(ColorDrawable(Color.parseColor("#151C2C")))
-                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply { marginEnd = 10; marginStart = 10 }
-            }
-            spinner.adapter = object : ArrayAdapter<String>(this@MainActivity, android.R.layout.simple_spinner_dropdown_item, items) {
-                override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
-                    val view = super.getView(position, convertView, parent) as TextView
-                    view.setTextColor(Color.WHITE); view.textSize = 12f; view.setPadding(20, 20, 20, 20)
-                    return view
-                }
-                override fun getDropDownView(position: Int, convertView: View?, parent: ViewGroup): View {
-                    val view = super.getDropDownView(position, convertView, parent) as TextView
-                    view.setTextColor(Color.parseColor("#E2E8F0")); view.setBackgroundColor(Color.parseColor("#151C2C")); view.setPadding(30, 30, 30, 30)
-                    return view
-                }
-            }
-            spinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
-                override fun onItemSelected(p0: AdapterView<*>?, p1: View?, pos: Int, p3: Long) { onItemSelected(pos) }
-                override fun onNothingSelected(p0: AdapterView<*>?) {}
-            }
-            return spinner
-        }
-
-        val styleSpinner = createSpinner(arrayOf("Standard", "Informal", "Action", "Comedy")) { pos ->
-            selectedStyle = when(pos) { 1 -> "Informal"; 2 -> "Action"; 3 -> "Comedy"; else -> "Standard professional" }
-        }
-        val colorSpinner = createSpinner(arrayOf("White", "Yellow", "Green", "Cyan")) { pos ->
-            selectedColor = when(pos) { 1 -> "#FFFF00"; 2 -> "#00FF00"; 3 -> "#00FFFF"; else -> "#FFFFFF" }
-            if (::subtitleOverlay.isInitialized) subtitleOverlay.setTextColor(Color.parseColor(selectedColor))
-        }
-        spinnerRow.addView(styleSpinner); spinnerRow.addView(colorSpinner)
 
         val previewFrame = FrameLayout(this).apply {
             layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f).apply { bottomMargin = 20 }
@@ -195,6 +158,46 @@ class MainActivity : ComponentActivity() {
 
         previewFrame.addView(videoView)
         previewFrame.addView(subtitleOverlay)
+
+        val spinnerRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            weightSum = 2f
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { bottomMargin = 20 }
+        }
+
+        fun createSpinner(items: Array<String>, onItemSelected: (Int) -> Unit): Spinner {
+            val spinner = Spinner(this@MainActivity).apply {
+                background = GradientDrawable().apply { setColor(Color.parseColor("#151C2C")); cornerRadius = 20f; setStroke(2, Color.parseColor("#2A344A")) }
+                setPopupBackgroundDrawable(ColorDrawable(Color.parseColor("#151C2C")))
+                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply { marginEnd = 10; marginStart = 10 }
+            }
+            spinner.adapter = object : ArrayAdapter<String>(this@MainActivity, android.R.layout.simple_spinner_dropdown_item, items) {
+                override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
+                    val view = super.getView(position, convertView, parent) as TextView
+                    view.setTextColor(Color.WHITE); view.textSize = 12f; view.setPadding(20, 20, 20, 20)
+                    return view
+                }
+                override fun getDropDownView(position: Int, convertView: View?, parent: ViewGroup): View {
+                    val view = super.getDropDownView(position, convertView, parent) as TextView
+                    view.setTextColor(Color.parseColor("#E2E8F0")); view.setBackgroundColor(Color.parseColor("#151C2C")); view.setPadding(30, 30, 30, 30)
+                    return view
+                }
+            }
+            spinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+                override fun onItemSelected(p0: AdapterView<*>?, p1: View?, pos: Int, p3: Long) { onItemSelected(pos) }
+                override fun onNothingSelected(p0: AdapterView<*>?) {}
+            }
+            return spinner
+        }
+
+        val styleSpinner = createSpinner(arrayOf("Standard", "Informal", "Action", "Comedy")) { pos ->
+            selectedStyle = when(pos) { 1 -> "Informal"; 2 -> "Action"; 3 -> "Comedy"; else -> "Standard professional" }
+        }
+        val colorSpinner = createSpinner(arrayOf("White", "Yellow", "Green", "Cyan")) { pos ->
+            selectedColor = when(pos) { 1 -> "#FFFF00"; 2 -> "#00FF00"; 3 -> "#00FFFF"; else -> "#FFFFFF" }
+            if (::subtitleOverlay.isInitialized) subtitleOverlay.setTextColor(Color.parseColor(selectedColor))
+        }
+        spinnerRow.addView(styleSpinner); spinnerRow.addView(colorSpinner)
 
         val toggleRow = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -325,7 +328,7 @@ class MainActivity : ComponentActivity() {
 
                             withContext(Dispatchers.Main) {
                                 if (isSaved) {
-                                    statusText.text = "✅ ပြီးစီးပါပြီ! SRT အား Downloads/AutoSRT တွင် အလိုလိုသိမ်းပေးလိုက်ပါသည်။"
+                                    statusText.text = "✅ ပြီးစီးပါပြီ! SRT အား Downloads/AutoSRT တွင် သိမ်းပေးလိုက်ပါသည်။"
                                     statusText.setTextColor(Color.parseColor("#4ADE80"))
                                     btnExportVideo.visibility = View.VISIBLE
                                 } else {
@@ -349,24 +352,22 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        // --- CRASH FIX: Safe Video Export Logic ---
+        // --- [Crash Fix 2 & 3] Async Execution နှင့် Video Scale ပြုလုပ်ခြင်း ---
         btnExportVideo.setOnClickListener {
             if (generatedSrtContent.isEmpty() || selectedVideoUri == null) return@setOnClickListener
             
-            // RAM မပြည့်စေရန် Video ဖွင့်ထားခြင်းကို ခဏရပ် (Pause) ပါမည်
+            // Video Play နေပါက ခဏရပ်ပေးမည် (RAM မပြည့်စေရန်)
             if (videoView.isPlaying) {
                 videoView.pause()
             }
             
-            btnExportVideo.isEnabled = false; btnExportVideo.text = "⏳ Rendering Video..."
-            statusText.text = "⚙️ Video အသစ်ထုတ်နေပါသည်...\nApp ကို မပိတ်ဘဲ စောင့်ပေးပါ။ (ကြာနိုင်ပါသည်)"
+            btnExportVideo.isEnabled = false
+            btnExportVideo.text = "⏳ Rendering Video..."
+            statusText.text = "⚙️ Video အသစ်ထုတ်နေပါသည်...\nApp ကို မပိတ်ဘဲ စောင့်ပေးပါ။"
             statusText.setTextColor(Color.parseColor("#FBBF24"))
 
             CoroutineScope(Dispatchers.IO).launch {
                 try {
-                    // Font Error မတက်စေရန် ကြိုတင်သတ်မှတ်ခြင်း
-                    try { FFmpegKitConfig.setFontDirectory(this@MainActivity, "/system/fonts", emptyMap<String, String>()) } catch (e: Exception) { e.printStackTrace() }
-
                     val inputVideoFile = File(cacheDir, "input_video.mp4")
                     contentResolver.openInputStream(selectedVideoUri!!)?.use { input ->
                         FileOutputStream(inputVideoFile).use { output -> input.copyTo(output) }
@@ -379,51 +380,56 @@ class MainActivity : ComponentActivity() {
                     if (outputVideoFile.exists()) outputVideoFile.delete()
 
                     val boxStyle = if (isBgVisible) "BorderStyle=3,BackColour=&H80000000," else ""
+                    val safeSrtPath = srtFile.absolutePath.replace("'", "\\\\'")
                     
-                    // Path ကြောင့် Crash မဖြစ်စေရန် သေချာစွာ ရှင်းလင်းရေးသားခြင်း
-                    val safeSrtPath = srtFile.absolutePath.replace("\\", "/").replace(":", "\\:")
-                    val vfArg = "subtitles=$safeSrtPath:force_style='${boxStyle}Fontsize=18'"
+                    // RAM ထိန်းချုပ်ရန် Video ၏ အကျယ်ကို 720p သို့ Scale လုပ်ပြီးမှ စာတန်းထိုးကပ်ပါမည်။ မူရင်း Ratio မပျက်ပါ။
+                    val filterStr = "scale=-2:720,subtitles='$safeSrtPath':fontsdir=/system/fonts:force_style='${boxStyle}Fontsize=18'"
                     
-                    // String အစား Array ဖြင့်ခေါ်ယူခြင်းဖြင့် String Parsing Crash များကို 100% ကာကွယ်ပေးသည်
-                    val cmdArgs = arrayOf(
-                        "-y",
-                        "-i", inputVideoFile.absolutePath,
-                        "-vf", vfArg,
-                        "-c:v", "libx264",
-                        "-preset", "ultrafast",
-                        "-threads", "2",
-                        "-c:a", "copy",
-                        outputVideoFile.absolutePath
-                    )
+                    val cmd = "-y -i \"${inputVideoFile.absolutePath}\" -vf \"$filterStr\" -c:v libx264 -preset ultrafast -crf 28 -threads 2 -c:a copy \"${outputVideoFile.absolutePath}\""
 
-                    val session = FFmpegKit.executeWithArguments(cmdArgs)
-                    
-                    if (ReturnCode.isSuccess(session.returnCode)) {
-                        // --- AUTO SAVE VIDEO ---
-                        val isSaved = autoSaveVideoFile("AutoSRT_Video_${System.currentTimeMillis()}.mp4", outputVideoFile)
+                    // App ရုတ်တရက် ပိတ်မကျစေရန် Background Thread တွင် လုံခြုံစွာ Run မည့် Async စနစ်
+                    FFmpegKit.executeAsync(cmd, { session -> 
+                        val returnCode = session.returnCode
+                        if (ReturnCode.isSuccess(returnCode)) {
+                            // --- AUTO SAVE VIDEO ---
+                            val isSaved = autoSaveVideoFile("AutoSRT_Video_${System.currentTimeMillis()}.mp4", outputVideoFile)
 
-                        withContext(Dispatchers.Main) {
-                            if (isSaved) {
-                                statusText.text = "✅ အောင်မြင်ပါသည်! ဗီဒီယိုအား Movies/AutoSRT တွင် အလိုလိုသိမ်းပေးလိုက်ပါသည်။"
-                                statusText.setTextColor(Color.parseColor("#4ADE80"))
-                            } else {
-                                statusText.text = "❌ ဖိုင်သိမ်းရန် Permission လိုအပ်ပါသည်။"
+                            CoroutineScope(Dispatchers.Main).launch {
+                                if (isSaved) {
+                                    statusText.text = "✅ အောင်မြင်ပါသည်! ဗီဒီယိုအား Movies/AutoSRT တွင် သိမ်းပေးလိုက်ပါသည်။"
+                                    statusText.setTextColor(Color.parseColor("#4ADE80"))
+                                } else {
+                                    statusText.text = "❌ ဖိုင်သိမ်းရန် Permission လိုအပ်ပါသည်။"
+                                    statusText.setTextColor(Color.parseColor("#EF4444"))
+                                }
+                                btnExportVideo.isEnabled = true
+                                btnExportVideo.text = "🎬 Export Video (Burn-in)"
+                            }
+                        } else {
+                            CoroutineScope(Dispatchers.Main).launch {
+                                statusText.text = "❌ Rendering Failed! ဖုန်း Memory မလောက်ငှခြင်း ဖြစ်နိုင်ပါသည်။"
                                 statusText.setTextColor(Color.parseColor("#EF4444"))
+                                btnExportVideo.isEnabled = true
+                                btnExportVideo.text = "🎬 Export Video (Burn-in)"
                             }
                         }
-                    } else {
-                        withContext(Dispatchers.Main) {
-                            statusText.text = "❌ Rendering Failed! ဗီဒီယို ဖိုင်ဆိုဒ် ကြီးမားလွန်းနေနိုင်ပါသည်။"
-                            statusText.setTextColor(Color.parseColor("#EF4444"))
+                        try { inputVideoFile.delete(); srtFile.delete(); outputVideoFile.delete() } catch(e: Exception){}
+                    }, { log -> 
+                        // FFmpeg Log ကို လိုအပ်ပါက ဤနေရာတွင် ဖမ်းယူနိုင်သည်
+                    }, { statistics -> 
+                        // Video ထုတ်နေသည့် အချိန် (စက္ကန့်) ကို Live ပြပေးမည်
+                        val timeSec = statistics.time / 1000
+                        CoroutineScope(Dispatchers.Main).launch {
+                            statusText.text = "⚙️ Rendering... ($timeSec seconds)"
                         }
-                    }
-
-                    try { inputVideoFile.delete(); srtFile.delete(); outputVideoFile.delete() } catch(e: Exception){}
+                    })
 
                 } catch (e: Exception) {
-                    withContext(Dispatchers.Main) { statusText.text = "❌ Error: ${e.message}" }
-                } finally {
-                    withContext(Dispatchers.Main) { btnExportVideo.isEnabled = true; btnExportVideo.text = "🎬 Export Video (Burn-in)" }
+                    withContext(Dispatchers.Main) { 
+                        statusText.text = "❌ Error: ${e.message}" 
+                        btnExportVideo.isEnabled = true
+                        btnExportVideo.text = "🎬 Export Video (Burn-in)"
+                    }
                 }
             }
         }
