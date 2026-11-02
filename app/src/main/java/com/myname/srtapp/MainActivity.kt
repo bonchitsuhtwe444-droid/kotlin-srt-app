@@ -1,6 +1,7 @@
 package com.myname.srtapp
 
 import android.annotation.SuppressLint
+import android.content.ContentValues
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.ColorDrawable
@@ -11,6 +12,8 @@ import android.media.MediaFormat
 import android.media.MediaMuxer
 import android.net.Uri
 import android.os.Bundle
+import android.os.Environment
+import android.provider.MediaStore
 import android.text.InputType
 import android.util.Base64
 import android.view.Gravity
@@ -21,6 +24,8 @@ import android.view.ViewGroup
 import android.widget.*
 import androidx.activity.ComponentActivity
 import androidx.activity.result.contract.ActivityResultContracts
+import com.arthenica.ffmpegkit.FFmpegKit
+import com.arthenica.ffmpegkit.ReturnCode
 import kotlinx.coroutines.*
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.OkHttpClient
@@ -28,6 +33,7 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
 import java.io.File
+import java.io.FileOutputStream
 import java.nio.ByteBuffer
 import java.util.concurrent.TimeUnit
 
@@ -45,7 +51,6 @@ class MainActivity : ComponentActivity() {
     private var isSubVisible = true
     private var isBgVisible = true
 
-    // Gestures Variables
     private var scaleFactor = 1.0f
     private var dX = 0f
     private var dY = 0f
@@ -70,7 +75,7 @@ class MainActivity : ComponentActivity() {
             contentResolver.openOutputStream(uri)?.use { outputStream ->
                 outputStream.write(generatedSrtContent.toByteArray())
             }
-            statusText.text = "🎉 အောင်မြင်ပါသည်။ SRT ကို သိမ်းဆည်းပြီးပါပြီ။\n(Video Export စနစ် မကြာမီ လာမည်)"
+            statusText.text = "🎉 SRT ဖိုင်ကို အောင်မြင်စွာ သိမ်းဆည်းပြီးပါပြီ။"
             statusText.setTextColor(Color.parseColor("#38BDF8"))
         }
     }
@@ -252,11 +257,10 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        // --- Touch Gestures (Drag & Pinch to Zoom) ---
         val scaleGestureDetector = ScaleGestureDetector(this, object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
             override fun onScale(detector: ScaleGestureDetector): Boolean {
                 scaleFactor *= detector.scaleFactor
-                scaleFactor = Math.max(0.5f, Math.min(scaleFactor, 3.0f)) // ကန့်သတ်ချက်
+                scaleFactor = Math.max(0.5f, Math.min(scaleFactor, 3.0f))
                 subtitleOverlay.scaleX = scaleFactor
                 subtitleOverlay.scaleY = scaleFactor
                 return true
@@ -325,6 +329,7 @@ class MainActivity : ComponentActivity() {
         
         val previewCard = createCardSection("3. Live Preview (Drag & Zoom)", previewContainer)
 
+        // --- 4. Generation & Export ---
         val statusLayout = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER }
         statusText = TextView(this).apply {
             text = "Waiting to start..."
@@ -332,8 +337,9 @@ class MainActivity : ComponentActivity() {
             gravity = Gravity.CENTER
             setPadding(0, 20, 0, 40)
         }
+        
         val btnGenerate = Button(this).apply {
-            text = "🚀 Generate SRT"
+            text = "🚀 1. Generate SRT"
             isAllCaps = false
             textSize = 16f
             setTypeface(null, Typeface.BOLD)
@@ -343,7 +349,23 @@ class MainActivity : ComponentActivity() {
                 intArrayOf(Color.parseColor("#00C6FF"), Color.parseColor("#0072FF"))
             ).apply { cornerRadius = 25f }
             setPadding(0, 40, 0, 40)
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { bottomMargin = 20 }
+        }
+
+        // 🎬 Export Video ခလုတ်အသစ်
+        val btnExportVideo = Button(this).apply {
+            text = "🎬 2. Export Video (Burn-in)"
+            isAllCaps = false
+            textSize = 16f
+            setTypeface(null, Typeface.BOLD)
+            setTextColor(Color.WHITE)
+            background = GradientDrawable(
+                GradientDrawable.Orientation.TL_BR,
+                intArrayOf(Color.parseColor("#F59E0B"), Color.parseColor("#D97706")) // Amber Color
+            ).apply { cornerRadius = 25f }
+            setPadding(0, 40, 0, 40)
             layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
+            visibility = View.GONE // အစပိုင်းတွင် ဖျောက်ထားမည်
         }
 
         btnGenerate.setOnClickListener {
@@ -361,6 +383,7 @@ class MainActivity : ComponentActivity() {
 
             btnGenerate.isEnabled = false
             btnGenerate.alpha = 0.5f
+            btnExportVideo.visibility = View.GONE
 
             CoroutineScope(Dispatchers.IO).launch {
                 try {
@@ -444,10 +467,11 @@ class MainActivity : ComponentActivity() {
                             generatedSrtContent = extractedText
 
                             withContext(Dispatchers.Main) {
-                                statusText.text = "✅ ပြီးစီးပါပြီ! SRT ဖိုင်ကို သိမ်းပါ။"
+                                statusText.text = "✅ ပြီးစီးပါပြီ! SRT ဖိုင်ကို အရင်သိမ်းဆည်းပါ။"
                                 statusText.setTextColor(Color.parseColor("#4ADE80"))
                                 saveSrtLauncher.launch("gemini_myanmar.srt")
-                                subtitleOverlay.text = "🎉 SRT ဖန်တီးမှု ပြီးစီးပါပြီ!"
+                                subtitleOverlay.text = "🎉 ဖန်တီးမှု ပြီးစီးပါပြီ!\n(အောက်ပါခလုတ်ဖြင့် Video ထုတ်နိုင်ပါပြီ)"
+                                btnExportVideo.visibility = View.VISIBLE // SRT ရပြီဆိုမှ Video ခလုတ်ပေါ်မည်
                             }
                         } catch (e: Exception) {
                             withContext(Dispatchers.Main) {
@@ -477,8 +501,93 @@ class MainActivity : ComponentActivity() {
             }
         }
 
+        // FFmpeg Export Logic
+        btnExportVideo.setOnClickListener {
+            if (generatedSrtContent.isEmpty() || selectedVideoUri == null) return@setOnClickListener
+            
+            btnExportVideo.isEnabled = false
+            btnExportVideo.text = "⏳ Rendering Video... (ကြာနိုင်ပါသည်)"
+            statusText.text = "⚙️ Video ပေါ်သို့ စာတန်းထိုးကပ်နေပါသည်...\nဖုန်းအားမပိတ်ဘဲ စောင့်ပေးပါ။"
+            statusText.setTextColor(Color.parseColor("#FBBF24"))
+
+            CoroutineScope(Dispatchers.IO).launch {
+                try {
+                    // ၁။ Video ဖိုင်ကို Cache ထဲ ကူးယူခြင်း (FFmpeg ဖတ်နိုင်ရန်)
+                    val inputVideoFile = File(cacheDir, "input_video.mp4")
+                    contentResolver.openInputStream(selectedVideoUri!!)?.use { input ->
+                        FileOutputStream(inputVideoFile).use { output ->
+                            input.copyTo(output)
+                        }
+                    }
+
+                    // ၂။ SRT ဖိုင်ကို Cache ထဲ သိမ်းခြင်း
+                    val srtFile = File(cacheDir, "temp_sub.srt")
+                    srtFile.writeText(generatedSrtContent)
+
+                    // ၃။ Output ဖိုင်နေရာ သတ်မှတ်ခြင်း
+                    val outputVideoFile = File(cacheDir, "output_video.mp4")
+                    if (outputVideoFile.exists()) outputVideoFile.delete()
+
+                    // ၄။ FFmpeg Command တည်ဆောက်ခြင်း
+                    val boxStyle = if (isBgVisible) "BorderStyle=4,BackColour=&H80000000," else ""
+                    val srtPath = srtFile.absolutePath.replace("'", "\\\\'")
+                    
+                    // မှတ်ချက် - လက်ဖြင့် ရွှေ့ထားသော အတိအကျ X/Y နေရာကို FFmpeg တွင် တိုက်ရိုက်ချိတ်ဆက်ရန် အလွန်ခက်ခဲသောကြောင့်
+                    // ဤအဆင့်တွင် စာတန်းထိုးကို အရောင်နှင့် Box ပါဝင်အောင်သာ အရင်ဆုံး Burn-in လုပ်ပြထားပါသည်။ 
+                    // (Build အောင်မြင်ပါက နောက်အဆင့်တွင် Matrix တွက်ချက်မှု ထပ်ပေါင်းထည့်ပါမည်)
+                    val cmd = "-y -i \"${inputVideoFile.absolutePath}\" -vf \"subtitles='${srtPath}':force_style='${boxStyle}Fontsize=18'\" -c:v libx264 -preset fast -c:a copy \"${outputVideoFile.absolutePath}\""
+
+                    // ၅။ FFmpegKit ဖြင့် Run ခြင်း
+                    val session = FFmpegKit.execute(cmd)
+                    
+                    if (ReturnCode.isSuccess(session.returnCode)) {
+                        // ၆။ အောင်မြင်ပါက Gallery/Downloads ထဲသို့ ရွှေ့ပေးခြင်း
+                        val values = ContentValues().apply {
+                            put(MediaStore.Video.Media.DISPLAY_NAME, "AutoSRT_Export_${System.currentTimeMillis()}.mp4")
+                            put(MediaStore.Video.Media.MIME_TYPE, "video/mp4")
+                            put(MediaStore.Video.Media.RELATIVE_PATH, Environment.DIRECTORY_MOVIES + "/AutoSRT")
+                        }
+                        
+                        val uri = contentResolver.insert(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, values)
+                        if (uri != null) {
+                            contentResolver.openOutputStream(uri)?.use { out ->
+                                outputVideoFile.inputStream().use { it.copyTo(out) }
+                            }
+                        }
+
+                        withContext(Dispatchers.Main) {
+                            statusText.text = "✅ အောင်မြင်ပါသည်!\nဗီဒီယိုကို ဖုန်း Gallery (Movies/AutoSRT) ထဲတွင် ကြည့်နိုင်ပါပြီ။"
+                            statusText.setTextColor(Color.parseColor("#4ADE80"))
+                        }
+                    } else {
+                        withContext(Dispatchers.Main) {
+                            statusText.text = "❌ Rendering Failed! (FFmpeg Error)"
+                            statusText.setTextColor(Color.parseColor("#EF4444"))
+                        }
+                    }
+
+                    // Clean up temp files
+                    inputVideoFile.delete()
+                    srtFile.delete()
+                    outputVideoFile.delete()
+
+                } catch (e: Exception) {
+                    withContext(Dispatchers.Main) {
+                        statusText.text = "❌ Error: ${e.message}"
+                        statusText.setTextColor(Color.parseColor("#EF4444"))
+                    }
+                } finally {
+                    withContext(Dispatchers.Main) {
+                        btnExportVideo.isEnabled = true
+                        btnExportVideo.text = "🎬 2. Export Video (Burn-in)"
+                    }
+                }
+            }
+        }
+
         statusLayout.addView(statusText)
         statusLayout.addView(btnGenerate)
+        statusLayout.addView(btnExportVideo)
         val actionCard = createCardSection("4. Action", statusLayout)
 
         mainLayout.addView(titleText)
