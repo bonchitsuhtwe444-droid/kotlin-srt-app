@@ -183,7 +183,8 @@ class MainActivity : ComponentActivity() {
 
                     // URL တွင် Space များ ပါမသွားစေရန် trim() လုပ်ထားပါသည်
                     val cleanedApiKey = apiKey.trim()
-                    val urlStr = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=$cleanedApiKey"
+                    val urlStr = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$cleanedApiKey"
+
 
                     val request = Request.Builder()
                         .url(urlStr)
