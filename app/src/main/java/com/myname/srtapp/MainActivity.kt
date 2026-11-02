@@ -1,5 +1,6 @@
 package com.myname.srtapp
 
+import android.annotation.SuppressLint
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.ColorDrawable
@@ -13,6 +14,8 @@ import android.os.Bundle
 import android.text.InputType
 import android.util.Base64
 import android.view.Gravity
+import android.view.MotionEvent
+import android.view.ScaleGestureDetector
 import android.view.View
 import android.view.ViewGroup
 import android.widget.*
@@ -36,12 +39,16 @@ class MainActivity : ComponentActivity() {
     private var selectedStyle = "Standard"
     private var selectedColor = "#FFFFFF"
 
-    // Preview UI Components
     private lateinit var previewContainer: LinearLayout
     private lateinit var videoView: VideoView
     private lateinit var subtitleOverlay: TextView
     private var isSubVisible = true
     private var isBgVisible = true
+
+    // Gestures Variables
+    private var scaleFactor = 1.0f
+    private var dX = 0f
+    private var dY = 0f
 
     private val pickVideoLauncher = registerForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
         if (uri != null) {
@@ -49,7 +56,6 @@ class MainActivity : ComponentActivity() {
             statusText.text = "✅ ဗီဒီယိုဖိုင် ရွေးချယ်ပြီးပါပြီ။"
             statusText.setTextColor(Color.parseColor("#4ADE80"))
             
-            // Show Video Preview
             previewContainer.visibility = View.VISIBLE
             videoView.setVideoURI(uri)
             videoView.setOnPreparedListener { mp -> 
@@ -64,16 +70,17 @@ class MainActivity : ComponentActivity() {
             contentResolver.openOutputStream(uri)?.use { outputStream ->
                 outputStream.write(generatedSrtContent.toByteArray())
             }
-            statusText.text = "🎉 အောင်မြင်ပါသည်။ SRT ကို သိမ်းဆည်းပြီးပါပြီ။"
+            statusText.text = "🎉 အောင်မြင်ပါသည်။ SRT ကို သိမ်းဆည်းပြီးပါပြီ။\n(Video Export စနစ် မကြာမီ လာမည်)"
             statusText.setTextColor(Color.parseColor("#38BDF8"))
         }
     }
 
+    @SuppressLint("ClickableViewAccessibility")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
         val scrollView = ScrollView(this).apply {
-            setBackgroundColor(Color.parseColor("#0B101E")) // Obsidian Dark
+            setBackgroundColor(Color.parseColor("#0B101E"))
             isFillViewport = true
         }
 
@@ -117,7 +124,7 @@ class MainActivity : ComponentActivity() {
                 text = title
                 textSize = 14f
                 setTypeface(null, Typeface.BOLD)
-                setTextColor(Color.parseColor("#00C6FF")) // Cyan Title
+                setTextColor(Color.parseColor("#00C6FF"))
                 setPadding(0, 0, 0, 25)
             }
             card.addView(titleView)
@@ -125,15 +132,14 @@ class MainActivity : ComponentActivity() {
             return card
         }
 
-        // --- PLATINUM SPINNER FUNCTION ---
         fun createPlatinumSpinner(items: Array<String>, onItemSelected: (Int) -> Unit): Spinner {
             val spinner = Spinner(this).apply {
                 background = GradientDrawable().apply {
                     setColor(Color.parseColor("#0B101E"))
                     cornerRadius = 25f
-                    setStroke(2, Color.parseColor("#00C6FF")) // Platinum Border
+                    setStroke(2, Color.parseColor("#00C6FF"))
                 }
-                setPopupBackgroundDrawable(ColorDrawable(Color.parseColor("#151C2C"))) // Dark Dropdown
+                setPopupBackgroundDrawable(ColorDrawable(Color.parseColor("#151C2C")))
                 layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { bottomMargin = 30 }
             }
 
@@ -160,7 +166,6 @@ class MainActivity : ComponentActivity() {
             return spinner
         }
 
-        // --- 1. API Key ---
         val apiKeyInput = EditText(this).apply {
             hint = "Enter Gemini API Key"
             setHintTextColor(Color.parseColor("#475569"))
@@ -176,7 +181,6 @@ class MainActivity : ComponentActivity() {
         }
         val apiKeyCard = createCardSection("1. Authentication", apiKeyInput)
 
-        // --- 2. Configuration ---
         val mediaLayout = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         
         val btnPickVideo = Button(this).apply {
@@ -213,7 +217,6 @@ class MainActivity : ComponentActivity() {
                 3 -> "#00FFFF"
                 else -> "#FFFFFF"
             }
-            // Update preview text color if initialized
             if (::subtitleOverlay.isInitialized) {
                 subtitleOverlay.setTextColor(Color.parseColor(selectedColor))
             }
@@ -221,7 +224,6 @@ class MainActivity : ComponentActivity() {
         mediaLayout.addView(colorSpinner)
         val mediaCard = createCardSection("2. Configuration", mediaLayout)
 
-        // --- 3. Video Preview & Overlays (PHASE 2) ---
         previewContainer = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             visibility = View.GONE
@@ -238,22 +240,49 @@ class MainActivity : ComponentActivity() {
         }
         
         subtitleOverlay = TextView(this).apply {
-            text = "Subtitle Preview\n(စာတန်းထိုး နမူနာ ဤနေရာတွင်ပေါ်မည်)"
+            text = "Subtitle Preview\n(လက်ဖြင့်ရွှေ့နိုင်၊ ချုံ့ချဲ့နိုင်ပါသည်)"
             setTextColor(Color.WHITE)
             textSize = 16f
             gravity = Gravity.CENTER
-            setBackgroundColor(Color.parseColor("#99000000")) // Semi-transparent black bg box
-            setPadding(20, 10, 20, 10)
-            layoutParams = FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT).apply {
-                gravity = Gravity.BOTTOM
+            setBackgroundColor(Color.parseColor("#99000000")) 
+            setPadding(30, 20, 30, 20)
+            layoutParams = FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT).apply {
+                gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
                 bottomMargin = 40
             }
+        }
+
+        // --- Touch Gestures (Drag & Pinch to Zoom) ---
+        val scaleGestureDetector = ScaleGestureDetector(this, object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
+            override fun onScale(detector: ScaleGestureDetector): Boolean {
+                scaleFactor *= detector.scaleFactor
+                scaleFactor = Math.max(0.5f, Math.min(scaleFactor, 3.0f)) // ကန့်သတ်ချက်
+                subtitleOverlay.scaleX = scaleFactor
+                subtitleOverlay.scaleY = scaleFactor
+                return true
+            }
+        })
+
+        subtitleOverlay.setOnTouchListener { view, event ->
+            scaleGestureDetector.onTouchEvent(event)
+            when (event.actionMasked) {
+                MotionEvent.ACTION_DOWN -> {
+                    dX = view.x - event.rawX
+                    dY = view.y - event.rawY
+                }
+                MotionEvent.ACTION_MOVE -> {
+                    if (!scaleGestureDetector.isInProgress) {
+                        view.x = event.rawX + dX
+                        view.y = event.rawY + dY
+                    }
+                }
+            }
+            true
         }
         
         frameLayout.addView(videoView)
         frameLayout.addView(subtitleOverlay)
         
-        // Toggle Buttons
         val toggleRow = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             weightSum = 2f
@@ -294,9 +323,8 @@ class MainActivity : ComponentActivity() {
         previewContainer.addView(frameLayout)
         previewContainer.addView(toggleRow)
         
-        val previewCard = createCardSection("3. Live Preview", previewContainer)
+        val previewCard = createCardSection("3. Live Preview (Drag & Zoom)", previewContainer)
 
-        // --- 4. Generation ---
         val statusLayout = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER }
         statusText = TextView(this).apply {
             text = "Waiting to start..."
@@ -419,8 +447,7 @@ class MainActivity : ComponentActivity() {
                                 statusText.text = "✅ ပြီးစီးပါပြီ! SRT ဖိုင်ကို သိမ်းပါ။"
                                 statusText.setTextColor(Color.parseColor("#4ADE80"))
                                 saveSrtLauncher.launch("gemini_myanmar.srt")
-                                // Update preview with real subtitle sample
-                                subtitleOverlay.text = "Generation Complete!\n(SRT is ready to save)"
+                                subtitleOverlay.text = "🎉 SRT ဖန်တီးမှု ပြီးစီးပါပြီ!"
                             }
                         } catch (e: Exception) {
                             withContext(Dispatchers.Main) {
@@ -458,7 +485,7 @@ class MainActivity : ComponentActivity() {
         mainLayout.addView(subTitleText)
         mainLayout.addView(apiKeyCard)
         mainLayout.addView(mediaCard)
-        mainLayout.addView(previewCard) // Added Video Preview Card
+        mainLayout.addView(previewCard) 
         mainLayout.addView(actionCard)
 
         scrollView.addView(mainLayout)
