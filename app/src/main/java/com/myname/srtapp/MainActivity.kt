@@ -75,7 +75,6 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Screen ကို အပေါ်အောက် ဆွဲစရာမလိုဘဲ တန့်နေစေရန် Main Layout တည်ဆောက်ခြင်း
         val mainLayout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setBackgroundColor(Color.parseColor("#0B101E")) 
@@ -83,7 +82,6 @@ class MainActivity : ComponentActivity() {
             setPadding(30, 40, 30, 40)
         }
 
-        // 1. Title
         val titleText = TextView(this).apply {
             text = "AUTO SRT GEN"
             textSize = 22f
@@ -93,7 +91,6 @@ class MainActivity : ComponentActivity() {
             layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { bottomMargin = 20 }
         }
 
-        // 2. API Key Input
         val apiKeyInput = EditText(this).apply {
             hint = "Enter Gemini API Key"
             setHintTextColor(Color.parseColor("#475569"))
@@ -109,9 +106,51 @@ class MainActivity : ComponentActivity() {
             layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { bottomMargin = 20 }
         }
 
-        // 3. Preview Elements
+        val spinnerRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            weightSum = 2f
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { bottomMargin = 20 }
+        }
+
+        fun createSpinner(items: Array<String>, onItemSelected: (Int) -> Unit): Spinner {
+            val spinner = Spinner(this@MainActivity).apply {
+                background = GradientDrawable().apply {
+                    setColor(Color.parseColor("#151C2C"))
+                    cornerRadius = 20f
+                    setStroke(2, Color.parseColor("#2A344A"))
+                }
+                setPopupBackgroundDrawable(ColorDrawable(Color.parseColor("#151C2C")))
+                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply { marginEnd = 10; marginStart = 10 }
+            }
+            spinner.adapter = object : ArrayAdapter<String>(this@MainActivity, android.R.layout.simple_spinner_dropdown_item, items) {
+                override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
+                    val view = super.getView(position, convertView, parent) as TextView
+                    view.setTextColor(Color.WHITE); view.textSize = 12f; view.setPadding(20, 20, 20, 20)
+                    return view
+                }
+                override fun getDropDownView(position: Int, convertView: View?, parent: ViewGroup): View {
+                    val view = super.getDropDownView(position, convertView, parent) as TextView
+                    view.setTextColor(Color.parseColor("#E2E8F0")); view.setBackgroundColor(Color.parseColor("#151C2C")); view.setPadding(30, 30, 30, 30)
+                    return view
+                }
+            }
+            spinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+                override fun onItemSelected(p0: AdapterView<*>?, p1: View?, pos: Int, p3: Long) { onItemSelected(pos) }
+                override fun onNothingSelected(p0: AdapterView<*>?) {}
+            }
+            return spinner
+        }
+
+        val styleSpinner = createSpinner(arrayOf("Standard", "Informal", "Action", "Comedy")) { pos ->
+            selectedStyle = when(pos) { 1 -> "Informal"; 2 -> "Action"; 3 -> "Comedy"; else -> "Standard professional" }
+        }
+        val colorSpinner = createSpinner(arrayOf("White", "Yellow", "Green", "Cyan")) { pos ->
+            selectedColor = when(pos) { 1 -> "#FFFF00"; 2 -> "#00FF00"; 3 -> "#00FFFF"; else -> "#FFFFFF" }
+            if (::subtitleOverlay.isInitialized) subtitleOverlay.setTextColor(Color.parseColor(selectedColor))
+        }
+        spinnerRow.addView(styleSpinner); spinnerRow.addView(colorSpinner)
+
         val previewFrame = FrameLayout(this).apply {
-            // weight 1f အသုံးပြုထားသဖြင့် 16:9 တွင်မဆို Screen ကို အလိုလိုချဲ့ပေးမည်
             layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f).apply { bottomMargin = 20 }
             background = GradientDrawable().apply { setColor(Color.BLACK); cornerRadius = 25f }
             clipToOutline = true
@@ -157,52 +196,6 @@ class MainActivity : ComponentActivity() {
         previewFrame.addView(videoView)
         previewFrame.addView(subtitleOverlay)
 
-        // 4. Spinners Row (Tone & Color)
-        val spinnerRow = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            weightSum = 2f
-            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { bottomMargin = 20 }
-        }
-
-        fun createSpinner(items: Array<String>, onItemSelected: (Int) -> Unit): Spinner {
-            val spinner = Spinner(this@MainActivity).apply {
-                background = GradientDrawable().apply {
-                    setColor(Color.parseColor("#151C2C"))
-                    cornerRadius = 20f
-                    setStroke(2, Color.parseColor("#2A344A"))
-                }
-                setPopupBackgroundDrawable(ColorDrawable(Color.parseColor("#151C2C")))
-                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply { marginEnd = 10; marginStart = 10 }
-            }
-            spinner.adapter = object : ArrayAdapter<String>(this@MainActivity, android.R.layout.simple_spinner_dropdown_item, items) {
-                override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
-                    val view = super.getView(position, convertView, parent) as TextView
-                    view.setTextColor(Color.WHITE); view.textSize = 12f; view.setPadding(20, 20, 20, 20)
-                    return view
-                }
-                override fun getDropDownView(position: Int, convertView: View?, parent: ViewGroup): View {
-                    val view = super.getDropDownView(position, convertView, parent) as TextView
-                    view.setTextColor(Color.parseColor("#E2E8F0")); view.setBackgroundColor(Color.parseColor("#151C2C")); view.setPadding(30, 30, 30, 30)
-                    return view
-                }
-            }
-            spinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
-                override fun onItemSelected(p0: AdapterView<*>?, p1: View?, pos: Int, p3: Long) { onItemSelected(pos) }
-                override fun onNothingSelected(p0: AdapterView<*>?) {}
-            }
-            return spinner
-        }
-
-        val styleSpinner = createSpinner(arrayOf("Standard", "Informal", "Action", "Comedy")) { pos ->
-            selectedStyle = when(pos) { 1 -> "Informal"; 2 -> "Action"; 3 -> "Comedy"; else -> "Standard professional" }
-        }
-        val colorSpinner = createSpinner(arrayOf("White", "Yellow", "Green", "Cyan")) { pos ->
-            selectedColor = when(pos) { 1 -> "#FFFF00"; 2 -> "#00FF00"; 3 -> "#00FFFF"; else -> "#FFFFFF" }
-            subtitleOverlay.setTextColor(Color.parseColor(selectedColor))
-        }
-        spinnerRow.addView(styleSpinner); spinnerRow.addView(colorSpinner)
-
-        // 5. Toggles Row (Sub ON / Box ON)
         val toggleRow = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             weightSum = 2f
@@ -234,7 +227,6 @@ class MainActivity : ComponentActivity() {
         }
         toggleRow.addView(btnToggleSub); toggleRow.addView(btnToggleBg)
 
-        // 6. Action Buttons Row
         val actionRow = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             weightSum = 2f
@@ -257,7 +249,6 @@ class MainActivity : ComponentActivity() {
         }
         actionRow.addView(btnPickVideo); actionRow.addView(btnGenerate)
 
-        // 7. Export Video Button
         btnExportVideo = Button(this).apply {
             text = "🎬 Export Video (Burn-in)"
             isAllCaps = false; setTextColor(Color.WHITE); setTypeface(null, Typeface.BOLD)
@@ -266,7 +257,6 @@ class MainActivity : ComponentActivity() {
             visibility = View.GONE
         }
 
-        // 8. Status Text
         statusText = TextView(this).apply {
             text = "Ready to start..."
             setTextColor(Color.parseColor("#94A3B8"))
@@ -331,7 +321,6 @@ class MainActivity : ComponentActivity() {
                             if (selectedColor != "#FFFFFF") extractedText = applyColorToSrt(extractedText, selectedColor)
                             generatedSrtContent = extractedText
 
-                            // --- AUTO SAVE SRT (No Dialog, No Crash) ---
                             val isSaved = autoSaveTextFile("AutoSRT_${System.currentTimeMillis()}.srt", generatedSrtContent)
 
                             withContext(Dispatchers.Main) {
@@ -360,17 +349,22 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        // FFmpeg Export Logic
+        // --- CRASH FIX: Safe Video Export Logic ---
         btnExportVideo.setOnClickListener {
             if (generatedSrtContent.isEmpty() || selectedVideoUri == null) return@setOnClickListener
             
+            // RAM မပြည့်စေရန် Video ဖွင့်ထားခြင်းကို ခဏရပ် (Pause) ပါမည်
+            if (videoView.isPlaying) {
+                videoView.pause()
+            }
+            
             btnExportVideo.isEnabled = false; btnExportVideo.text = "⏳ Rendering Video..."
-            statusText.text = "⚙️ Video အသစ်ထုတ်နေပါသည်...\nApp ကို မပိတ်ဘဲ စောင့်ပေးပါ။"
+            statusText.text = "⚙️ Video အသစ်ထုတ်နေပါသည်...\nApp ကို မပိတ်ဘဲ စောင့်ပေးပါ။ (ကြာနိုင်ပါသည်)"
             statusText.setTextColor(Color.parseColor("#FBBF24"))
 
             CoroutineScope(Dispatchers.IO).launch {
                 try {
-                    // Safe Font Loading to prevent native crashes
+                    // Font Error မတက်စေရန် ကြိုတင်သတ်မှတ်ခြင်း
                     try { FFmpegKitConfig.setFontDirectory(this@MainActivity, "/system/fonts", emptyMap<String, String>()) } catch (e: Exception) { e.printStackTrace() }
 
                     val inputVideoFile = File(cacheDir, "input_video.mp4")
@@ -384,16 +378,29 @@ class MainActivity : ComponentActivity() {
                     val outputVideoFile = File(cacheDir, "output_video.mp4")
                     if (outputVideoFile.exists()) outputVideoFile.delete()
 
-                    val boxStyle = if (isBgVisible) "BorderStyle=4,BackColour=&H80000000," else ""
-                    val safeSrtPath = srtFile.absolutePath.replace("'", "\\\\'")
+                    val boxStyle = if (isBgVisible) "BorderStyle=3,BackColour=&H80000000," else ""
                     
-                    val cmd = "-y -i \"$inputVideoFile\" -vf \"subtitles='$safeSrtPath':force_style='${boxStyle}Fontsize=18'\" -c:v libx264 -preset ultrafast -threads 2 -c:a copy \"$outputVideoFile\""
+                    // Path ကြောင့် Crash မဖြစ်စေရန် သေချာစွာ ရှင်းလင်းရေးသားခြင်း
+                    val safeSrtPath = srtFile.absolutePath.replace("\\", "/").replace(":", "\\:")
+                    val vfArg = "subtitles=$safeSrtPath:force_style='${boxStyle}Fontsize=18'"
+                    
+                    // String အစား Array ဖြင့်ခေါ်ယူခြင်းဖြင့် String Parsing Crash များကို 100% ကာကွယ်ပေးသည်
+                    val cmdArgs = arrayOf(
+                        "-y",
+                        "-i", inputVideoFile.absolutePath,
+                        "-vf", vfArg,
+                        "-c:v", "libx264",
+                        "-preset", "ultrafast",
+                        "-threads", "2",
+                        "-c:a", "copy",
+                        outputVideoFile.absolutePath
+                    )
 
-                    val session = FFmpegKit.execute(cmd)
+                    val session = FFmpegKit.executeWithArguments(cmdArgs)
                     
                     if (ReturnCode.isSuccess(session.returnCode)) {
-                        // --- AUTO SAVE VIDEO (No Dialog, No Crash) ---
-                        val isSaved = autoSaveVideoFile("AutoSRT_${System.currentTimeMillis()}.mp4", outputVideoFile)
+                        // --- AUTO SAVE VIDEO ---
+                        val isSaved = autoSaveVideoFile("AutoSRT_Video_${System.currentTimeMillis()}.mp4", outputVideoFile)
 
                         withContext(Dispatchers.Main) {
                             if (isSaved) {
@@ -406,12 +413,11 @@ class MainActivity : ComponentActivity() {
                         }
                     } else {
                         withContext(Dispatchers.Main) {
-                            statusText.text = "❌ Rendering Failed! (FFmpeg Error)"
+                            statusText.text = "❌ Rendering Failed! ဗီဒီယို ဖိုင်ဆိုဒ် ကြီးမားလွန်းနေနိုင်ပါသည်။"
                             statusText.setTextColor(Color.parseColor("#EF4444"))
                         }
                     }
 
-                    // Clean up caches safely
                     try { inputVideoFile.delete(); srtFile.delete(); outputVideoFile.delete() } catch(e: Exception){}
 
                 } catch (e: Exception) {
@@ -422,7 +428,6 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        // Views အားလုံးကို Layout အတွင်း ထည့်သွင်းခြင်း
         mainLayout.addView(titleText)
         mainLayout.addView(apiKeyInput)
         mainLayout.addView(spinnerRow)
@@ -435,7 +440,6 @@ class MainActivity : ComponentActivity() {
         setContentView(mainLayout)
     }
 
-    // --- AUTO SAVE FUNCTIONS (CRASH-FREE) ---
     private fun autoSaveTextFile(fileName: String, content: String): Boolean {
         return try {
             val values = ContentValues().apply {
