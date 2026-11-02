@@ -278,8 +278,11 @@ class MainActivity : ComponentActivity() {
                         })
                     }
 
-                    val cleanedApiKey = apiKey
-                    val urlStr = "https://" + "[generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=](https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=)" + cleanedApiKey
+                    // ဤနေရာတွင် URL ကို အပိုင်းပိုင်းဖြတ်ရေးထားသဖြင့် Link အပိုပါလာသော Error ထပ်မတက်နိုင်တော့ပါ
+                    val cleanedApiKey = apiKey.trim()
+                    val domain1 = "generativelanguage"
+                    val domain2 = ".googleapis.com"
+                    val urlStr = "https://" + domain1 + domain2 + "/v1beta/models/gemini-3.8-flash:generateContent?key=" + cleanedApiKey
                     
                     val request = Request.Builder().url(urlStr).post(geminiJson.toString().toRequestBody(jsonMediaType)).build()
 
