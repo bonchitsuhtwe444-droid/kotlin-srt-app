@@ -62,7 +62,6 @@ class MainActivity : ComponentActivity() {
             setPadding(60, 80, 60, 80)
         }
 
-        // Logo များကို ဖယ်ရှားပြီးဖြစ်၍ ခေါင်းစဉ်ကို သေသပ်စွာ တင်ထားသည်
         val titleText = TextView(this).apply {
             text = "Auto SRT Gen\n✨ (Gemini AI Edition)"
             textSize = 26f
@@ -132,13 +131,19 @@ class MainActivity : ComponentActivity() {
             }
 
             generateButton.isEnabled = false
-            statusText.text = "⏳ ၁။ Video မှ အသံဆွဲထုတ်နေပါသည်..."
+            statusText.text = "⏳ ၁။ Video မှ အသံဆွဲထုတ်နေပါသည်... (0%)"
             statusText.setTextColor(Color.parseColor("#FFD700"))
 
             CoroutineScope(Dispatchers.IO).launch {
                 try {
                     val audioFile = File(cacheDir, "extracted_audio.m4a")
-                    val extractSuccess = extractAudioFromVideo(selectedVideoUri!!, audioFile.absolutePath)
+                    
+                    // အသံခွဲထုတ်ရာတွင် % ပြနိုင်ရန် Callback ဖြင့် ခေါ်ယူခြင်း
+                    val extractSuccess = extractAudioFromVideo(selectedVideoUri!!, audioFile.absolutePath) { progress ->
+                        withContext(Dispatchers.Main) {
+                            statusText.text = "⏳ ၁။ Video မှ အသံဆွဲထုတ်နေပါသည်... ($progress%)"
+                        }
+                    }
 
                     if (!extractSuccess || !audioFile.exists()) {
                         withContext(Dispatchers.Main) {
@@ -150,15 +155,17 @@ class MainActivity : ComponentActivity() {
                     }
 
                     withContext(Dispatchers.Main) {
-                        statusText.text = "🌐 ၂။ Gemini ဖြင့် SRT နှင့် ဘာသာပြန်ခြင်းကို လုပ်ဆောင်နေပါသည်..."
+                        statusText.text = "🌐 ၂။ AI ဖြင့် ဘာသာပြန်နေပါသည်...\n(အချိန်အကန့်အသတ်မရှိ စောင့်ဆိုင်းနေပါသည်)"
                     }
 
                     val bytes = audioFile.readBytes()
                     val base64Audio = Base64.encodeToString(bytes, Base64.NO_WRAP)
 
+                    // 0 ဟုထားခြင်းဖြင့် Timeout လုံးဝမဖြစ်စေရန် ပြင်ဆင်ထားပါသည်
                     val client = OkHttpClient.Builder()
-                        .connectTimeout(120, TimeUnit.SECONDS)
-                        .readTimeout(120, TimeUnit.SECONDS)
+                        .connectTimeout(0, TimeUnit.SECONDS)
+                        .readTimeout(0, TimeUnit.SECONDS)
+                        .writeTimeout(0, TimeUnit.SECONDS)
                         .build()
 
                     val jsonMediaType = "application/json; charset=utf-8".toMediaTypeOrNull()
@@ -181,11 +188,8 @@ class MainActivity : ComponentActivity() {
                         })
                     }
 
-                    // URL တွင် Space များ ပါမသွားစေရန် trim() လုပ်ထားပါသည်
                     val cleanedApiKey = apiKey.trim()
-                    val urlStr = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=$cleanedApiKey"
-
-
+                    val urlStr = "[https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$cleanedApiKey](https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$cleanedApiKey)"
 
                     val request = Request.Builder()
                         .url(urlStr)
@@ -255,7 +259,8 @@ class MainActivity : ComponentActivity() {
         setContentView(layout)
     }
 
-    private fun extractAudioFromVideo(videoUri: Uri, outputPath: String): Boolean {
+    // % ပြနိုင်ရန် suspend function အဖြစ် ပြောင်းလဲထားပါသည်
+    private suspend fun extractAudioFromVideo(videoUri: Uri, outputPath: String, onProgress: suspend (Int) -> Unit): Boolean {
         val extractor = MediaExtractor()
         try {
             contentResolver.openFileDescriptor(videoUri, "r")?.fileDescriptor?.let {
@@ -277,6 +282,8 @@ class MainActivity : ComponentActivity() {
             extractor.selectTrack(audioTrackIndex)
             val format = extractor.getTrackFormat(audioTrackIndex)
             
+            val durationUs = try { format.getLong(MediaFormat.KEY_DURATION) } catch (e: Exception) { 0L }
+            
             val muxer = MediaMuxer(outputPath, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
             val muxerTrackIndex = muxer.addTrack(format)
             muxer.start()
@@ -284,6 +291,8 @@ class MainActivity : ComponentActivity() {
             val bufferSize = format.getInteger(MediaFormat.KEY_MAX_INPUT_SIZE).takeIf { it > 0 } ?: (1024 * 1024)
             val buffer = ByteBuffer.allocate(bufferSize)
             val bufferInfo = MediaCodec.BufferInfo()
+
+            var lastProgress = -1
 
             while (true) {
                 val sampleSize = extractor.readSampleData(buffer, 0)
@@ -294,10 +303,19 @@ class MainActivity : ComponentActivity() {
                 bufferInfo.flags = extractor.sampleFlags
                 bufferInfo.presentationTimeUs = extractor.sampleTime
                 
+                if (durationUs > 0) {
+                    val progress = ((bufferInfo.presentationTimeUs.toDouble() / durationUs.toDouble()) * 100).toInt()
+                    if (progress > lastProgress && progress <= 100) {
+                        onProgress(progress)
+                        lastProgress = progress
+                    }
+                }
+                
                 muxer.writeSampleData(muxerTrackIndex, buffer, bufferInfo)
                 extractor.advance()
             }
             
+            onProgress(100) // ပြီးဆုံးကြောင်း ပြရန်
             muxer.stop()
             muxer.release()
             extractor.release()
