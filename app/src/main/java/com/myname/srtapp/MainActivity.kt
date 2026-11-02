@@ -436,10 +436,11 @@ class MainActivity : ComponentActivity() {
                         })
                     }
 
+                    // ဤနေရာတွင် Gemini 3.5 Flash Lite သို့ ပြောင်းလဲချိတ်ဆက်ထားပါသည်
                     val cleanedApiKey = apiKey.trim()
                     val domain1 = "generativelanguage"
                     val domain2 = ".googleapis.com"
-                    val urlStr = "https://" + domain1 + domain2 + "/v1beta/models/gemini-3.8-flash:generateContent?key=" + cleanedApiKey
+                    val urlStr = "https://" + domain1 + domain2 + "/v1beta/models/gemini-3.5-flash-lite:generateContent?key=" + cleanedApiKey
                     
                     val request = Request.Builder().url(urlStr).post(geminiJson.toString().toRequestBody(jsonMediaType)).build()
 
@@ -638,7 +639,6 @@ class MainActivity : ComponentActivity() {
             val muxerTrackIndex = muxer.addTrack(format)
             muxer.start()
 
-            // ပုံထဲက Error ကို ဤနေရာတွင် ဖြေရှင်းထားပါသည်
             val bufferSize = try {
                 val size = format.getInteger(MediaFormat.KEY_MAX_INPUT_SIZE)
                 if (size > 0) size else 1024 * 1024
