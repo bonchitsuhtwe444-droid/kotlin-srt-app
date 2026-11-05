@@ -75,8 +75,6 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // လုံးဝမပိတ်ကျစေရန် Font ရှာသည့် Code အား App Launch တွင် မသုံးတော့ဘဲ ဖယ်ရှားလိုက်ပါပြီ
-
         val mainLayout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setBackgroundColor(Color.parseColor("#0B101E")) 
@@ -304,6 +302,7 @@ class MainActivity : ComponentActivity() {
                     }
 
                     val cleanedApiKey = apiKey.trim()
+                    // Reverted to gemini-3.5-flash-lite per your request
                     val urlStr = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key=$cleanedApiKey"
                     
                     val request = Request.Builder().url(urlStr).post(geminiJson.toString().toRequestBody(jsonMediaType)).build()
@@ -345,7 +344,7 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        // --- လုံးဝမပိတ်ကျစေသော Video Export စနစ်အသစ် (Async Execution & Even Resolution Fix) ---
+        // Export Video using safe command array
         btnExportVideo.setOnClickListener {
             if (generatedSrtContent.isEmpty() || selectedVideoUri == null) return@setOnClickListener
             
@@ -360,7 +359,6 @@ class MainActivity : ComponentActivity() {
 
             CoroutineScope(Dispatchers.IO).launch {
                 try {
-                    // Export လုပ်သည့်အချိန်ရောက်မှသာ လုံခြုံစွာ Font များကို ချိတ်ဆက်မည်
                     try {
                         FFmpegKitConfig.setFontDirectory(this@MainActivity, "/system/fonts", emptyMap<String, String>())
                     } catch (e: Exception) { e.printStackTrace() }
@@ -377,49 +375,45 @@ class MainActivity : ComponentActivity() {
                     if (outputVideoFile.exists()) outputVideoFile.delete()
 
                     val boxStyle = if (isBgVisible) "BorderStyle=3,BackColour=&H80000000," else ""
-                    val safeSrtPath = srtFile.absolutePath.replace("'", "\\\\'")
+                    val safeSrtPath = srtFile.absolutePath.replace("\\", "/").replace(":", "\\:")
+                    val vfArg = "scale='trunc(iw/2)*2':'trunc(ih/2)*2',subtitles=$safeSrtPath:fontsdir=/system/fonts:force_style='${boxStyle}Fontsize=18'"
                     
-                    // Video Resolution အား အလိုလို စုံကိန်းဖြစ်အောင် 'trunc(iw/2)*2' ကို အသုံးပြုထားသဖြင့် Error 100% ကင်းဝေးသွားမည်
-                    val vfArg = "scale='trunc(iw/2)*2':'trunc(ih/2)*2',subtitles='$safeSrtPath':fontsdir=/system/fonts:force_style='${boxStyle}Fontsize=18'"
+                    val cmdArgs = arrayOf(
+                        "-y",
+                        "-i", inputVideoFile.absolutePath,
+                        "-vf", vfArg,
+                        "-c:v", "libx264",
+                        "-preset", "ultrafast",
+                        "-threads", "2",
+                        "-c:a", "copy",
+                        outputVideoFile.absolutePath
+                    )
+
+                    val session = FFmpegKit.executeWithArguments(cmdArgs)
                     
-                    val cmd = "-y -i \"${inputVideoFile.absolutePath}\" -vf \"$vfArg\" -c:v libx264 -preset ultrafast -threads 2 -c:a copy \"${outputVideoFile.absolutePath}\""
+                    if (ReturnCode.isSuccess(session.returnCode)) {
+                        val isSaved = autoSaveVideoFile("AutoSRT_${System.currentTimeMillis()}.mp4", outputVideoFile)
 
-                    // Background တွင် သီးသန့် အလုပ်လုပ်မည့် Async စနစ်
-                    FFmpegKit.executeAsync(cmd, { session ->
-                        val returnCode = session.returnCode
-                        if (ReturnCode.isSuccess(returnCode)) {
-                            // Auto Save လုပ်မည်
-                            val isSaved = autoSaveVideoFile("AutoSRT_${System.currentTimeMillis()}.mp4", outputVideoFile)
-
-                            runOnUiThread {
-                                if (isSaved) {
-                                    statusText.text = "✅ အောင်မြင်ပါသည်! ဗီဒီယိုအား Movies/AutoSRT တွင် သိမ်းပေးလိုက်ပါသည်။"
-                                    statusText.setTextColor(Color.parseColor("#4ADE80"))
-                                } else {
-                                    statusText.text = "❌ ဖိုင်သိမ်းရန် Permission လိုအပ်ပါသည်။"
-                                    statusText.setTextColor(Color.parseColor("#EF4444"))
-                                }
-                                btnExportVideo.isEnabled = true
-                                btnExportVideo.text = "🎬 Export Video (Burn-in)"
-                            }
-                        } else {
-                            runOnUiThread {
-                                statusText.text = "❌ Rendering Failed! (Video Resolution ကြောင့်ဖြစ်နိုင်ပါသည်)"
-                                statusText.setTextColor(Color.parseColor("#EF4444"))
-                                btnExportVideo.isEnabled = true
-                                btnExportVideo.text = "🎬 Export Video (Burn-in)"
-                            }
-                        }
-                        try { inputVideoFile.delete(); srtFile.delete(); outputVideoFile.delete() } catch(e: Exception){}
-                    }, { log -> 
-                        // Log (မလိုအပ်ပါ)
-                    }, { statistics -> 
-                        // Live အချိန်ပြပေးမည်
-                        val timeSec = statistics.time / 1000
                         runOnUiThread {
-                            statusText.text = "⚙️ Rendering... ($timeSec seconds)"
+                            if (isSaved) {
+                                statusText.text = "✅ အောင်မြင်ပါသည်! ဗီဒီယိုအား Movies/AutoSRT တွင် သိမ်းပေးလိုက်ပါသည်။"
+                                statusText.setTextColor(Color.parseColor("#4ADE80"))
+                            } else {
+                                statusText.text = "❌ ဖိုင်သိမ်းရန် Permission လိုအပ်ပါသည်။"
+                                statusText.setTextColor(Color.parseColor("#EF4444"))
+                            }
+                            btnExportVideo.isEnabled = true
+                            btnExportVideo.text = "🎬 Export Video (Burn-in)"
                         }
-                    })
+                    } else {
+                        runOnUiThread {
+                            statusText.text = "❌ Rendering Failed! (Video Resolution ကြောင့်ဖြစ်နိုင်ပါသည်)"
+                            statusText.setTextColor(Color.parseColor("#EF4444"))
+                            btnExportVideo.isEnabled = true
+                            btnExportVideo.text = "🎬 Export Video (Burn-in)"
+                        }
+                    }
+                    try { inputVideoFile.delete(); srtFile.delete(); outputVideoFile.delete() } catch(e: Exception){}
 
                 } catch (e: Exception) {
                     runOnUiThread { 
