@@ -36,6 +36,7 @@ import org.json.JSONObject
 import java.io.File
 import java.io.FileOutputStream
 import java.nio.ByteBuffer
+import java.util.Locale
 import java.util.concurrent.TimeUnit
 
 class MainActivity : ComponentActivity() {
@@ -203,7 +204,6 @@ class MainActivity : ComponentActivity() {
         ratioSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
             override fun onItemSelected(p0: AdapterView<*>?, p1: View?, pos: Int, p3: Long) {
                 selectedRatio = when(pos) { 1 -> "16:9"; 2 -> "9:16"; else -> "Original" }
-                // No layout resize needed here, VideoView adjusts itself naturally. 
             }
             override fun onNothingSelected(p0: AdapterView<*>?) {}
         }
@@ -216,7 +216,6 @@ class MainActivity : ComponentActivity() {
             clipToOutline = true
         }
 
-        // [Bug Fix] VideoContainer အသစ် ထည့်သွင်းခြင်း (စာတန်းထိုး အပြင်မထွက်အောင် Video ၏ ပုံမှန်ဆိုဒ်အတိုင်း ထိန်းချုပ်ပေးသည်)
         val videoContainer = FrameLayout(this).apply {
             layoutParams = FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT).apply { gravity = Gravity.CENTER }
         }
@@ -248,7 +247,6 @@ class MainActivity : ComponentActivity() {
             }
         })
 
-        // [Performance Fix] စာတန်းထိုး လေးကန်ခြင်းမရှိစေရန် Hardware Acceleration ကိုသုံးပြီး မြန်ဆန်စွာရွှေ့ပေးမည့်စနစ်အသစ်
         subtitleOverlay.setOnTouchListener { view, event ->
             scaleGestureDetector.onTouchEvent(event)
             if (!scaleGestureDetector.isInProgress) {
@@ -267,7 +265,6 @@ class MainActivity : ComponentActivity() {
                         val widthDiff = (scaledWidth - view.width) / 2
                         val heightDiff = (scaledHeight - view.height) / 2
 
-                        // Scale ချဲ့ထားသည့်တိုင်အောင် Video အပြင်သို့ လုံးဝထွက်မသွားစေရန် တိကျစွာတွက်ချက်ခြင်း
                         val minX = widthDiff
                         val maxX = parent.width - view.width - widthDiff
                         val minY = heightDiff
@@ -278,7 +275,6 @@ class MainActivity : ComponentActivity() {
                         if (newY < minY) newY = minY
                         if (newY > maxY) newY = maxY
 
-                        // .animate().setDuration(0) ဖြင့်ခေါ်ခြင်းက 60fps+ Smooth ဖြစ်စေပါသည်
                         view.animate().x(newX).y(newY).setDuration(0).start()
                     }
                 }
@@ -288,7 +284,7 @@ class MainActivity : ComponentActivity() {
 
         videoContainer.addView(videoView)
         videoContainer.addView(subtitleOverlay)
-        previewFrame.addView(videoContainer) // Subtitle သည် VideoContainer အတွင်း၌သာ သေချာစွာ နေမည်ဖြစ်သည်
+        previewFrame.addView(videoContainer)
 
         val toggleRow = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -416,10 +412,11 @@ class MainActivity : ComponentActivity() {
                     val bytes = audioFile.readBytes()
                     val base64Audio = Base64.encodeToString(bytes, Base64.NO_WRAP)
                     
+                    // --- (FIX) Timeout များကို 0 (အကန့်အသတ်မရှိ စောင့်မည်) သို့ ပြောင်းလဲထားပါသည် ---
                     val client = OkHttpClient.Builder()
-                        .connectTimeout(60, TimeUnit.SECONDS)
-                        .readTimeout(60, TimeUnit.SECONDS)
-                        .writeTimeout(60, TimeUnit.SECONDS)
+                        .connectTimeout(0, TimeUnit.SECONDS)
+                        .readTimeout(0, TimeUnit.SECONDS)
+                        .writeTimeout(0, TimeUnit.SECONDS)
                         .build()
                         
                     val jsonMediaType = "application/json; charset=utf-8".toMediaTypeOrNull()
@@ -436,7 +433,6 @@ class MainActivity : ComponentActivity() {
                     }
 
                     val cleanedApiKey = apiKey.trim()
-                    // URL ကို သင်တောင်းဆိုထားသည့်အတိုင်း 3.5 flash lite သို့ တိကျစွာ ပြောင်းလဲပေးထားပါသည်
                     val urlStr = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key=$cleanedApiKey"
                     
                     val request = Request.Builder().url(urlStr).post(geminiJson.toString().toRequestBody(jsonMediaType)).build()
@@ -508,7 +504,6 @@ class MainActivity : ComponentActivity() {
                     val boxStyle = if (isBgVisible) "BorderStyle=3,BackColour=&H80000000," else ""
                     val safeSrtPath = srtFile.absolutePath.replace("\\", "/").replace(":", "\\:")
                     
-                    // [Bug Fix] Video Export တွင် စာတန်းထိုးကပ်ပြီးမှ Scale & Pad လုပ်ခြင်းဖြင့် အမည်းရောင်ဘောင်ပေါ်သို့ စာတန်းထိုးထွက်ခြင်းကို 100% ကာကွယ်ပေးသည်
                     val scaleArg = "scale='trunc(iw/2)*2':'trunc(ih/2)*2'"
                     val subtitleArg = "subtitles=$safeSrtPath:fontsdir=/system/fonts:force_style='${boxStyle}Fontsize=18'"
                     
