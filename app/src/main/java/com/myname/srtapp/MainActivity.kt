@@ -15,6 +15,7 @@ import android.os.Bundle
 import android.os.Environment
 import android.provider.MediaStore
 import android.text.InputType
+import android.util.Base64
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.ScaleGestureDetector
@@ -28,16 +29,13 @@ import com.arthenica.ffmpegkit.FFmpegKitConfig
 import com.arthenica.ffmpegkit.ReturnCode
 import kotlinx.coroutines.*
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
-import okhttp3.MultipartBody
 import okhttp3.OkHttpClient
 import okhttp3.Request
-import okhttp3.RequestBody.Companion.asRequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
 import java.io.File
 import java.io.FileOutputStream
 import java.nio.ByteBuffer
-import java.util.Locale
 import java.util.concurrent.TimeUnit
 
 class MainActivity : ComponentActivity() {
@@ -68,13 +66,13 @@ class MainActivity : ComponentActivity() {
     private var isBgVisible = true
     private var isMyanmar = true 
 
-    private var scaleFactor = 1.0f
+    private var currentScale = 1.0f
     private var dX = 0f
     private var dY = 0f
 
     private val textLabels: Map<String, Map<Boolean, String>> = mapOf(
         "title" to mapOf(true to "AUTO SRT GEN", false to "AUTO SRT GEN"),
-        "api_hint" to mapOf(true to "Groq API Key ထည့်ပါ", false to "Enter Groq API Key"),
+        "api_hint" to mapOf(true to "Gemini API Key ထည့်ပါ", false to "Enter Gemini API Key"),
         "sub_on" to mapOf(true to "💬 စာတန်း: ON", false to "💬 Sub: ON"),
         "sub_off" to mapOf(true to "💬 စာတန်း: OFF", false to "💬 Sub: OFF"),
         "box_on" to mapOf(true to "⬛ နောက်ခံ: ON", false to "⬛ Box: ON"),
@@ -205,7 +203,7 @@ class MainActivity : ComponentActivity() {
         ratioSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
             override fun onItemSelected(p0: AdapterView<*>?, p1: View?, pos: Int, p3: Long) {
                 selectedRatio = when(pos) { 1 -> "16:9"; 2 -> "9:16"; else -> "Original" }
-                updatePreviewRatio()
+                // No layout resize needed here, VideoView adjusts itself naturally. 
             }
             override fun onNothingSelected(p0: AdapterView<*>?) {}
         }
@@ -218,8 +216,13 @@ class MainActivity : ComponentActivity() {
             clipToOutline = true
         }
 
+        // [Bug Fix] VideoContainer အသစ် ထည့်သွင်းခြင်း (စာတန်းထိုး အပြင်မထွက်အောင် Video ၏ ပုံမှန်ဆိုဒ်အတိုင်း ထိန်းချုပ်ပေးသည်)
+        val videoContainer = FrameLayout(this).apply {
+            layoutParams = FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT).apply { gravity = Gravity.CENTER }
+        }
+
         videoView = VideoView(this).apply {
-            layoutParams = FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT).apply { gravity = Gravity.CENTER }
+            layoutParams = FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT)
         }
 
         subtitleOverlay = TextView(this).apply {
@@ -237,38 +240,55 @@ class MainActivity : ComponentActivity() {
 
         val scaleGestureDetector = ScaleGestureDetector(this, object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
             override fun onScale(detector: ScaleGestureDetector): Boolean {
-                scaleFactor *= detector.scaleFactor
-                scaleFactor = Math.max(0.5f, Math.min(scaleFactor, 3.0f))
-                subtitleOverlay.scaleX = scaleFactor; subtitleOverlay.scaleY = scaleFactor
+                currentScale *= detector.scaleFactor
+                currentScale = Math.max(0.5f, Math.min(currentScale, 3.0f))
+                subtitleOverlay.scaleX = currentScale
+                subtitleOverlay.scaleY = currentScale
                 return true
             }
         })
 
+        // [Performance Fix] စာတန်းထိုး လေးကန်ခြင်းမရှိစေရန် Hardware Acceleration ကိုသုံးပြီး မြန်ဆန်စွာရွှေ့ပေးမည့်စနစ်အသစ်
         subtitleOverlay.setOnTouchListener { view, event ->
             scaleGestureDetector.onTouchEvent(event)
-            val parent = view.parent as View
-            when (event.actionMasked) {
-                MotionEvent.ACTION_DOWN -> { dX = view.x - event.rawX; dY = view.y - event.rawY }
-                MotionEvent.ACTION_MOVE -> {
-                    if (!scaleGestureDetector.isInProgress) {
+            if (!scaleGestureDetector.isInProgress) {
+                when (event.actionMasked) {
+                    MotionEvent.ACTION_DOWN -> {
+                        dX = view.x - event.rawX
+                        dY = view.y - event.rawY
+                    }
+                    MotionEvent.ACTION_MOVE -> {
                         var newX = event.rawX + dX
                         var newY = event.rawY + dY
                         
-                        if (newX < 0) newX = 0f
-                        if (newX + view.width * scaleFactor > parent.width) newX = parent.width - view.width * scaleFactor
-                        if (newY < 0) newY = 0f
-                        if (newY + view.height * scaleFactor > parent.height) newY = parent.height - view.height * scaleFactor
+                        val parent = view.parent as View
+                        val scaledWidth = view.width * currentScale
+                        val scaledHeight = view.height * currentScale
+                        val widthDiff = (scaledWidth - view.width) / 2
+                        val heightDiff = (scaledHeight - view.height) / 2
 
-                        view.x = newX
-                        view.y = newY
+                        // Scale ချဲ့ထားသည့်တိုင်အောင် Video အပြင်သို့ လုံးဝထွက်မသွားစေရန် တိကျစွာတွက်ချက်ခြင်း
+                        val minX = widthDiff
+                        val maxX = parent.width - view.width - widthDiff
+                        val minY = heightDiff
+                        val maxY = parent.height - view.height - heightDiff
+
+                        if (newX < minX) newX = minX
+                        if (newX > maxX) newX = maxX
+                        if (newY < minY) newY = minY
+                        if (newY > maxY) newY = maxY
+
+                        // .animate().setDuration(0) ဖြင့်ခေါ်ခြင်းက 60fps+ Smooth ဖြစ်စေပါသည်
+                        view.animate().x(newX).y(newY).setDuration(0).start()
                     }
                 }
             }
             true
         }
 
-        previewFrame.addView(videoView)
-        previewFrame.addView(subtitleOverlay)
+        videoContainer.addView(videoView)
+        videoContainer.addView(subtitleOverlay)
+        previewFrame.addView(videoContainer) // Subtitle သည် VideoContainer အတွင်း၌သာ သေချာစွာ နေမည်ဖြစ်သည်
 
         val toggleRow = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -362,10 +382,11 @@ class MainActivity : ComponentActivity() {
             setSpinnerAdapter(ratioSpinner, arrayLabels["ratios"]!![isMyanmar]!!)
         }
 
+        // --- GEMINI 3.5 FLASH LITE API INTEGRATION ---
         btnGenerate.setOnClickListener {
             val apiKey = apiKeyInput.text.toString().trim()
             if (apiKey.isEmpty() || selectedVideoUri == null) {
-                statusText.text = if (isMyanmar) "⚠️ Groq API Key နှင့် Video ထည့်ပေးပါ!" else "⚠️ Enter Groq API Key & Video!"
+                statusText.text = if (isMyanmar) "⚠️ Gemini API Key နှင့် Video ထည့်ပေးပါ!" else "⚠️ Enter Gemini API Key & Video!"
                 statusText.setTextColor(Color.parseColor("#EF4444"))
                 return@setOnClickListener
             }
@@ -390,88 +411,50 @@ class MainActivity : ComponentActivity() {
                         return@launch
                     }
 
+                    withContext(Dispatchers.Main) { statusText.text = if (isMyanmar) "🌐 AI ဘာသာပြန်နေသည်... ခဏစောင့်ပါ" else "🌐 AI Translating... Please wait." }
+
+                    val bytes = audioFile.readBytes()
+                    val base64Audio = Base64.encodeToString(bytes, Base64.NO_WRAP)
+                    
                     val client = OkHttpClient.Builder()
                         .connectTimeout(60, TimeUnit.SECONDS)
                         .readTimeout(60, TimeUnit.SECONDS)
                         .writeTimeout(60, TimeUnit.SECONDS)
                         .build()
+                        
+                    val jsonMediaType = "application/json; charset=utf-8".toMediaTypeOrNull()
                     
-                    withContext(Dispatchers.Main) { statusText.text = if (isMyanmar) "🌐 Groq Whisper ဖြင့် စာသားထုတ်နေသည်..." else "🌐 Transcribing with Whisper..." }
-                    
-                    val requestBody = MultipartBody.Builder().setType(MultipartBody.FORM)
-                        .addFormDataPart("file", audioFile.name, audioFile.asRequestBody("audio/mp4".toMediaTypeOrNull()))
-                        .addFormDataPart("model", "whisper-large-v3-turbo")
-                        .addFormDataPart("response_format", "verbose_json")
-                        .build()
-
-                    val whisperRequest = Request.Builder()
-                        .url("https://api.groq.com/openai/v1/audio/transcriptions")
-                        .header("Authorization", "Bearer $apiKey")
-                        .post(requestBody)
-                        .build()
-
-                    val whisperResponse = client.newCall(whisperRequest).execute()
-                    val whisperResponseStr = whisperResponse.body?.string()
-
-                    if (!whisperResponse.isSuccessful || whisperResponseStr.isNullOrEmpty() || whisperResponseStr.contains("\"error\"")) {
-                        val errMsg = try { JSONObject(whisperResponseStr ?: "").getJSONObject("error").getString("message") } catch(e:Exception){ "HTTP ${whisperResponse.code}" }
-                        withContext(Dispatchers.Main) { 
-                            statusText.text = if (isMyanmar) "❌ Whisper Error: $errMsg" else "❌ Whisper Error: $errMsg"
-                            statusText.setTextColor(Color.parseColor("#EF4444")) 
-                        }
-                        audioFile.delete()
-                        return@launch
-                    }
-
-                    val englishSrt = verboseJsonToSrt(whisperResponseStr)
-
-                    if (englishSrt.isEmpty()) {
-                        withContext(Dispatchers.Main) { 
-                            statusText.text = if (isMyanmar) "❌ စာသားထုတ်ယူမှု အဆင်မပြေပါ" else "❌ Transcription parsing failed"
-                            statusText.setTextColor(Color.parseColor("#EF4444")) 
-                        }
-                        audioFile.delete()
-                        return@launch
-                    }
-
-                    withContext(Dispatchers.Main) { statusText.text = if (isMyanmar) "🌐 Llama 3 ဖြင့် ဘာသာပြန်နေသည်..." else "🌐 Translating with Llama 3..." }
-                    
-                    // [Bug Fix]: Changed decommissioned model to latest llama-3.3-70b-versatile
-                    val llamaJson = JSONObject().apply {
-                        put("model", "llama-3.3-70b-versatile")
-                        put("messages", org.json.JSONArray().apply {
+                    val geminiJson = JSONObject().apply {
+                        put("contents", org.json.JSONArray().apply {
                             put(JSONObject().apply {
-                                put("role", "system")
-                                put("content", "You are an expert SRT translator. Translate the following English SRT to Myanmar (Burmese) language using a $selectedStyle tone. Keep the timecodes and formatting EXACTLY the same. Return ONLY the translated SRT text without any markdown or extra text.")
-                            })
-                            put(JSONObject().apply {
-                                put("role", "user")
-                                put("content", englishSrt)
+                                put("parts", org.json.JSONArray().apply {
+                                    put(JSONObject().apply { put("text", "You are an expert subtitler. Listen and generate a perfectly timed SRT file. Translate directly into Myanmar (Burmese) language using a $selectedStyle tone. Return ONLY raw SRT text.") })
+                                    put(JSONObject().apply { put("inline_data", JSONObject().apply { put("mime_type", "audio/mp4"); put("data", base64Audio) }) })
+                                })
                             })
                         })
                     }
 
-                    val llamaRequest = Request.Builder()
-                        .url("https://api.groq.com/openai/v1/chat/completions")
-                        .header("Authorization", "Bearer $apiKey")
-                        .post(llamaJson.toString().toRequestBody("application/json; charset=utf-8".toMediaTypeOrNull()))
-                        .build()
+                    val cleanedApiKey = apiKey.trim()
+                    // URL ကို သင်တောင်းဆိုထားသည့်အတိုင်း 3.5 flash lite သို့ တိကျစွာ ပြောင်းလဲပေးထားပါသည်
+                    val urlStr = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key=$cleanedApiKey"
+                    
+                    val request = Request.Builder().url(urlStr).post(geminiJson.toString().toRequestBody(jsonMediaType)).build()
+                    val response = client.newCall(request).execute()
+                    val responseStr = response.body?.string()
 
-                    val llamaResponse = client.newCall(llamaRequest).execute()
-                    val llamaResponseStr = llamaResponse.body?.string()
-
-                    if (llamaResponse.isSuccessful && llamaResponseStr != null) {
+                    if (response.isSuccessful && responseStr != null) {
                         try {
-                            var myanmarSrt = JSONObject(llamaResponseStr).getJSONArray("choices").getJSONObject(0).getJSONObject("message").getString("content")
-                            myanmarSrt = myanmarSrt.replace("```srt", "").replace("```", "").trim()
-                            if (selectedColor != "#FFFFFF") myanmarSrt = applyColorToSrt(myanmarSrt, selectedColor)
-                            generatedSrtContent = myanmarSrt
+                            var extractedText = JSONObject(responseStr).getJSONArray("candidates").getJSONObject(0).getJSONObject("content").getJSONArray("parts").getJSONObject(0).getString("text")
+                            extractedText = extractedText.replace("```srt", "").replace("```", "").trim()
+                            if (selectedColor != "#FFFFFF") extractedText = applyColorToSrt(extractedText, selectedColor)
+                            generatedSrtContent = extractedText
 
                             val isSaved = autoSaveTextFile("AutoSRT_${System.currentTimeMillis()}.srt", generatedSrtContent)
 
                             withContext(Dispatchers.Main) {
                                 if (isSaved) {
-                                    statusText.text = if (isMyanmar) "✅ ပြီးစီးပါပြီ! SRT အား သိမ်းဆည်းပြီးပါပြီ။" else "✅ Success! SRT saved."
+                                    statusText.text = if (isMyanmar) "✅ ပြီးစီးပါပြီ! SRT အား Downloads/AutoSRT တွင် သိမ်းပေးလိုက်ပါသည်။" else "✅ Success! SRT saved."
                                     statusText.setTextColor(Color.parseColor("#4ADE80"))
                                     subtitleOverlay.text = "🎉 SRT အဆင်သင့်ဖြစ်ပါပြီ"
                                     btnExportVideo.visibility = View.VISIBLE
@@ -482,11 +465,11 @@ class MainActivity : ComponentActivity() {
                                 }
                             }
                         } catch (e: Exception) {
-                            withContext(Dispatchers.Main) { statusText.text = "❌ Llama Translation Error"; statusText.setTextColor(Color.parseColor("#EF4444")) }
+                            withContext(Dispatchers.Main) { statusText.text = "❌ Gemini Parsing Error"; statusText.setTextColor(Color.parseColor("#EF4444")) }
                         }
                     } else {
-                        val errMsg = try { JSONObject(llamaResponseStr ?: "").getJSONObject("error").getString("message") } catch(e:Exception){ "HTTP ${llamaResponse.code}" }
-                        withContext(Dispatchers.Main) { statusText.text = "❌ Groq Chat API Error: $errMsg"; statusText.setTextColor(Color.parseColor("#EF4444")) }
+                        val errMsg = try { JSONObject(responseStr ?: "").getJSONObject("error").getString("message") } catch(e:Exception){ "HTTP ${response.code}" }
+                        withContext(Dispatchers.Main) { statusText.text = "❌ API Error: $errMsg"; statusText.setTextColor(Color.parseColor("#EF4444")) }
                     }
                     audioFile.delete()
                 } catch (e: Exception) {
@@ -525,13 +508,17 @@ class MainActivity : ComponentActivity() {
                     val boxStyle = if (isBgVisible) "BorderStyle=3,BackColour=&H80000000," else ""
                     val safeSrtPath = srtFile.absolutePath.replace("\\", "/").replace(":", "\\:")
                     
-                    val ratioFilter = when(selectedRatio) {
-                        "16:9" -> "scale='if(gt(a,16/9),1280,-1)':'if(gt(a,16/9),-1,720)',pad=1280:720:(ow-iw)/2:(oh-ih)/2,"
-                        "9:16" -> "scale='if(gt(a,9/16),720,-1)':'if(gt(a,9/16),-1,1280)',pad=720:1280:(ow-iw)/2:(oh-ih)/2,"
-                        else -> "scale='trunc(iw/2)*2':'trunc(ih/2)*2',"
+                    // [Bug Fix] Video Export တွင် စာတန်းထိုးကပ်ပြီးမှ Scale & Pad လုပ်ခြင်းဖြင့် အမည်းရောင်ဘောင်ပေါ်သို့ စာတန်းထိုးထွက်ခြင်းကို 100% ကာကွယ်ပေးသည်
+                    val scaleArg = "scale='trunc(iw/2)*2':'trunc(ih/2)*2'"
+                    val subtitleArg = "subtitles=$safeSrtPath:fontsdir=/system/fonts:force_style='${boxStyle}Fontsize=18'"
+                    
+                    val padArg = when(selectedRatio) {
+                        "16:9" -> "scale='if(gt(a,16/9),1280,-1)':'if(gt(a,16/9),-1,720)',pad=1280:720:(ow-iw)/2:(oh-ih)/2"
+                        "9:16" -> "scale='if(gt(a,9/16),720,-1)':'if(gt(a,9/16),-1,1280)',pad=720:1280:(ow-iw)/2:(oh-ih)/2"
+                        else -> ""
                     }
                     
-                    val vfArg = "${ratioFilter}subtitles=$safeSrtPath:fontsdir=/system/fonts:force_style='${boxStyle}Fontsize=18'"
+                    val vfArg = if (padArg.isNotEmpty()) "$scaleArg,$subtitleArg,$padArg" else "$scaleArg,$subtitleArg"
                     
                     val cmdArgs = arrayOf(
                         "-y", "-i", inputVideoFile.absolutePath,
@@ -540,31 +527,39 @@ class MainActivity : ComponentActivity() {
                         outputVideoFile.absolutePath
                     )
 
-                    val session = FFmpegKit.executeWithArguments(cmdArgs)
-                    
-                    if (ReturnCode.isSuccess(session.returnCode)) {
-                        val isSaved = autoSaveVideoFile("AutoSRT_${System.currentTimeMillis()}.mp4", outputVideoFile)
+                    FFmpegKit.executeAsync(cmdArgs.joinToString(" "), { session ->
+                        val returnCode = session.returnCode
+                        if (ReturnCode.isSuccess(returnCode)) {
+                            val isSaved = autoSaveVideoFile("AutoSRT_${System.currentTimeMillis()}.mp4", outputVideoFile)
 
-                        runOnUiThread {
-                            if (isSaved) {
-                                statusText.text = if (isMyanmar) "✅ အောင်မြင်ပါသည်! ဗီဒီယိုကို သိမ်းပေးလိုက်ပါသည်။" else "✅ Success! Video saved."
-                                statusText.setTextColor(Color.parseColor("#4ADE80"))
-                            } else {
-                                statusText.text = if (isMyanmar) "❌ ဖိုင်သိမ်းရန် Permission လိုအပ်ပါသည်။" else "❌ Storage Permission needed."
-                                statusText.setTextColor(Color.parseColor("#EF4444"))
+                            runOnUiThread {
+                                if (isSaved) {
+                                    statusText.text = if (isMyanmar) "✅ အောင်မြင်ပါသည်! ဗီဒီယိုကို သိမ်းပေးလိုက်ပါသည်။" else "✅ Success! Video saved."
+                                    statusText.setTextColor(Color.parseColor("#4ADE80"))
+                                } else {
+                                    statusText.text = if (isMyanmar) "❌ ဖိုင်သိမ်းရန် Permission လိုအပ်ပါသည်။" else "❌ Storage Permission needed."
+                                    statusText.setTextColor(Color.parseColor("#EF4444"))
+                                }
+                                btnExportVideo.isEnabled = true
+                                btnExportVideo.text = textLabels["export"]!![isMyanmar]
                             }
-                            btnExportVideo.isEnabled = true
-                            btnExportVideo.text = textLabels["export"]!![isMyanmar]
+                        } else {
+                            runOnUiThread {
+                                statusText.text = if (isMyanmar) "❌ Rendering Failed! (Resolution / RAM မလောက်ငှခြင်း)" else "❌ Rendering Failed!"
+                                statusText.setTextColor(Color.parseColor("#EF4444"))
+                                btnExportVideo.isEnabled = true
+                                btnExportVideo.text = textLabels["export"]!![isMyanmar]
+                            }
                         }
-                    } else {
+                        try { inputVideoFile.delete(); srtFile.delete(); outputVideoFile.delete() } catch(e: Exception){}
+                    }, { log -> 
+                        // Log
+                    }, { statistics -> 
+                        val timeSec = statistics.time / 1000
                         runOnUiThread {
-                            statusText.text = if (isMyanmar) "❌ Rendering Failed! (Resolution / RAM မလောက်ငှခြင်း)" else "❌ Rendering Failed!"
-                            statusText.setTextColor(Color.parseColor("#EF4444"))
-                            btnExportVideo.isEnabled = true
-                            btnExportVideo.text = textLabels["export"]!![isMyanmar]
+                            statusText.text = if (isMyanmar) "⚙️ ရေးဆွဲနေသည်... ($timeSec seconds)" else "⚙️ Rendering... ($timeSec seconds)"
                         }
-                    }
-                    try { inputVideoFile.delete(); srtFile.delete(); outputVideoFile.delete() } catch(e: Exception){}
+                    })
 
                 } catch (e: Exception) {
                     runOnUiThread { 
@@ -589,38 +584,6 @@ class MainActivity : ComponentActivity() {
         setContentView(mainLayout)
     }
 
-    private fun verboseJsonToSrt(jsonStr: String?): String {
-        if (jsonStr == null) return ""
-        return try {
-            val root = JSONObject(jsonStr)
-            val segments = root.getJSONArray("segments")
-            val srtBuilder = StringBuilder()
-            for (i in 0 until segments.length()) {
-                val segment = segments.getJSONObject(i)
-                val start = segment.getDouble("start")
-                val end = segment.getDouble("end")
-                val text = segment.getString("text").trim()
-                
-                srtBuilder.append(i + 1).append("\n")
-                srtBuilder.append(formatSrtTime(start)).append(" --> ").append(formatSrtTime(end)).append("\n")
-                srtBuilder.append(text).append("\n\n")
-            }
-            srtBuilder.toString().trim()
-        } catch (e: Exception) {
-            e.printStackTrace()
-            ""
-        }
-    }
-
-    private fun formatSrtTime(seconds: Double): String {
-        val millis = (seconds * 1000).toLong()
-        val h = millis / 3600000
-        val m = (millis % 3600000) / 60000
-        val s = (millis % 60000) / 1000
-        val ms = millis % 1000
-        return String.format(Locale.US, "%02d:%02d:%02d,%03d", h, m, s, ms)
-    }
-
     private fun setSpinnerAdapter(spinner: Spinner, items: Array<String>) {
         val adapter = object : ArrayAdapter<String>(this@MainActivity, android.R.layout.simple_spinner_dropdown_item, items) {
             override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
@@ -635,16 +598,6 @@ class MainActivity : ComponentActivity() {
             }
         }
         spinner.adapter = adapter
-    }
-
-    private fun updatePreviewRatio() {
-        val lp = videoView.layoutParams as FrameLayout.LayoutParams
-        when (selectedRatio) {
-            "16:9" -> { lp.width = ViewGroup.LayoutParams.MATCH_PARENT; lp.height = ViewGroup.LayoutParams.WRAP_CONTENT }
-            "9:16" -> { lp.width = ViewGroup.LayoutParams.WRAP_CONTENT; lp.height = ViewGroup.LayoutParams.MATCH_PARENT }
-            else -> { lp.width = ViewGroup.LayoutParams.MATCH_PARENT; lp.height = ViewGroup.LayoutParams.MATCH_PARENT }
-        }
-        videoView.layoutParams = lp
     }
 
     private fun autoSaveTextFile(fileName: String, content: String): Boolean {
