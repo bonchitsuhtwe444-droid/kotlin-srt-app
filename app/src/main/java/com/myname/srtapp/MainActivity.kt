@@ -52,7 +52,7 @@ class MainActivity : ComponentActivity() {
     private lateinit var subtitleOverlay: TextView
     private lateinit var btnExportVideo: Button
     
-    // UI Elements for Translation
+    // UI Elements
     private lateinit var titleText: TextView
     private lateinit var apiKeyInput: EditText
     private lateinit var btnToggleSub: Button
@@ -67,14 +67,14 @@ class MainActivity : ComponentActivity() {
 
     private var isSubVisible = true
     private var isBgVisible = true
-    private var isMyanmar = true // Language state
+    private var isMyanmar = true 
 
     private var scaleFactor = 1.0f
     private var dX = 0f
     private var dY = 0f
 
-    // Labels Dictionary
-    private val labels = mapOf(
+    // [Crash Fix] သီးသန့်ခွဲထုတ်ထားသော String Dictionary
+    private val textLabels: Map<String, Map<Boolean, String>> = mapOf(
         "title" to mapOf(true to "AUTO SRT GEN", false to "AUTO SRT GEN"),
         "api_hint" to mapOf(true to "Groq API Key ထည့်ပါ", false to "Enter Groq API Key"),
         "sub_on" to mapOf(true to "💬 စာတန်း: ON", false to "💬 Sub: ON"),
@@ -85,7 +85,11 @@ class MainActivity : ComponentActivity() {
         "gen_srt" to mapOf(true to "🚀 SRT ထုတ်မည်", false to "🚀 Generate SRT"),
         "export" to mapOf(true to "🎬 ဗီဒီယို အသစ်ထုတ်မည်", false to "🎬 Export Video (Burn-in)"),
         "ready" to mapOf(true to "အသင့်ဖြစ်ပါပြီ...", false to "Ready to start..."),
-        "preview" to mapOf(true to "Subtitle Preview\n(လက်ဖြင့်ရွှေ့နိုင်၊ ချုံ့ချဲ့နိုင်ပါသည်)", false to "Subtitle Preview\n(Drag and zoom manually)"),
+        "preview" to mapOf(true to "Subtitle Preview\n(လက်ဖြင့်ရွှေ့နိုင်၊ ချုံ့ချဲ့နိုင်ပါသည်)", false to "Subtitle Preview\n(Drag and zoom manually)")
+    )
+
+    // [Crash Fix] သီးသန့်ခွဲထုတ်ထားသော Array Dictionary
+    private val arrayLabels: Map<String, Map<Boolean, Array<String>>> = mapOf(
         "styles" to mapOf(
             true to arrayOf("ပုံမှန် (Standard)", "အလွတ်သဘော (Informal)", "အက်ရှင် (Action)", "ဟာသ (Comedy)"),
             false to arrayOf("Standard", "Informal", "Action", "Comedy")
@@ -125,7 +129,6 @@ class MainActivity : ComponentActivity() {
             setPadding(30, 40, 30, 40)
         }
 
-        // --- Language Toggle ---
         val langToggleRow = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.END
@@ -140,7 +143,7 @@ class MainActivity : ComponentActivity() {
         langToggleRow.addView(btnLang)
 
         titleText = TextView(this).apply {
-            text = labels["title"]!![isMyanmar]
+            text = textLabels["title"]!![isMyanmar]
             textSize = 22f
             setTypeface(null, Typeface.BOLD)
             setTextColor(Color.parseColor("#00C6FF"))
@@ -149,7 +152,7 @@ class MainActivity : ComponentActivity() {
         }
 
         apiKeyInput = EditText(this).apply {
-            hint = labels["api_hint"]!![isMyanmar]
+            hint = textLabels["api_hint"]!![isMyanmar]
             setHintTextColor(Color.parseColor("#475569"))
             setTextColor(Color.WHITE)
             textSize = 14f
@@ -169,43 +172,47 @@ class MainActivity : ComponentActivity() {
             layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { bottomMargin = 15 }
         }
 
-        fun createSpinner(items: Array<String>, onItemSelected: (Int) -> Unit): Spinner {
-            val spinner = Spinner(this@MainActivity).apply {
-                background = GradientDrawable().apply { setColor(Color.parseColor("#151C2C")); cornerRadius = 20f; setStroke(2, Color.parseColor("#2A344A")) }
-                setPopupBackgroundDrawable(ColorDrawable(Color.parseColor("#151C2C")))
-                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply { marginEnd = 5; marginStart = 5 }
-            }
-            val adapter = object : ArrayAdapter<String>(this@MainActivity, android.R.layout.simple_spinner_dropdown_item, items) {
-                override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
-                    val view = super.getView(position, convertView, parent) as TextView
-                    view.setTextColor(Color.WHITE); view.textSize = 11f; view.setPadding(15, 20, 15, 20); view.gravity = Gravity.CENTER
-                    return view
-                }
-                override fun getDropDownView(position: Int, convertView: View?, parent: ViewGroup): View {
-                    val view = super.getDropDownView(position, convertView, parent) as TextView
-                    view.setTextColor(Color.parseColor("#E2E8F0")); view.setBackgroundColor(Color.parseColor("#151C2C")); view.setPadding(30, 30, 30, 30)
-                    return view
-                }
-            }
-            spinner.adapter = adapter
-            spinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
-                override fun onItemSelected(p0: AdapterView<*>?, p1: View?, pos: Int, p3: Long) { onItemSelected(pos) }
-                override fun onNothingSelected(p0: AdapterView<*>?) {}
-            }
-            return spinner
+        styleSpinner = Spinner(this).apply {
+            background = GradientDrawable().apply { setColor(Color.parseColor("#151C2C")); cornerRadius = 20f; setStroke(2, Color.parseColor("#2A344A")) }
+            setPopupBackgroundDrawable(ColorDrawable(Color.parseColor("#151C2C")))
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply { marginEnd = 5; marginStart = 5 }
+        }
+        colorSpinner = Spinner(this).apply {
+            background = GradientDrawable().apply { setColor(Color.parseColor("#151C2C")); cornerRadius = 20f; setStroke(2, Color.parseColor("#2A344A")) }
+            setPopupBackgroundDrawable(ColorDrawable(Color.parseColor("#151C2C")))
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply { marginEnd = 5; marginStart = 5 }
+        }
+        ratioSpinner = Spinner(this).apply {
+            background = GradientDrawable().apply { setColor(Color.parseColor("#151C2C")); cornerRadius = 20f; setStroke(2, Color.parseColor("#2A344A")) }
+            setPopupBackgroundDrawable(ColorDrawable(Color.parseColor("#151C2C")))
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply { marginEnd = 5; marginStart = 5 }
         }
 
-        styleSpinner = createSpinner(labels["styles"]!![isMyanmar]!!) { pos ->
-            selectedStyle = when(pos) { 1 -> "Informal"; 2 -> "Action"; 3 -> "Comedy"; else -> "Standard professional" }
+        setSpinnerAdapter(styleSpinner, arrayLabels["styles"]!![isMyanmar]!!)
+        setSpinnerAdapter(colorSpinner, arrayLabels["colors"]!![isMyanmar]!!)
+        setSpinnerAdapter(ratioSpinner, arrayLabels["ratios"]!![isMyanmar]!!)
+
+        styleSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(p0: AdapterView<*>?, p1: View?, pos: Int, p3: Long) {
+                selectedStyle = when(pos) { 1 -> "Informal"; 2 -> "Action"; 3 -> "Comedy"; else -> "Standard professional" }
+            }
+            override fun onNothingSelected(p0: AdapterView<*>?) {}
         }
-        colorSpinner = createSpinner(labels["colors"]!![isMyanmar]!!) { pos ->
-            selectedColor = when(pos) { 1 -> "#FFFF00"; 2 -> "#00FF00"; 3 -> "#00FFFF"; else -> "#FFFFFF" }
-            if (::subtitleOverlay.isInitialized) subtitleOverlay.setTextColor(Color.parseColor(selectedColor))
+        colorSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(p0: AdapterView<*>?, p1: View?, pos: Int, p3: Long) {
+                selectedColor = when(pos) { 1 -> "#FFFF00"; 2 -> "#00FF00"; 3 -> "#00FFFF"; else -> "#FFFFFF" }
+                if (::subtitleOverlay.isInitialized) subtitleOverlay.setTextColor(Color.parseColor(selectedColor))
+            }
+            override fun onNothingSelected(p0: AdapterView<*>?) {}
         }
-        ratioSpinner = createSpinner(labels["ratios"]!![isMyanmar]!!) { pos ->
-            selectedRatio = when(pos) { 1 -> "16:9"; 2 -> "9:16"; else -> "Original" }
-            updatePreviewRatio()
+        ratioSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(p0: AdapterView<*>?, p1: View?, pos: Int, p3: Long) {
+                selectedRatio = when(pos) { 1 -> "16:9"; 2 -> "9:16"; else -> "Original" }
+                updatePreviewRatio()
+            }
+            override fun onNothingSelected(p0: AdapterView<*>?) {}
         }
+
         spinnerRow.addView(styleSpinner); spinnerRow.addView(colorSpinner); spinnerRow.addView(ratioSpinner)
 
         val previewFrame = FrameLayout(this).apply {
@@ -219,7 +226,7 @@ class MainActivity : ComponentActivity() {
         }
 
         subtitleOverlay = TextView(this).apply {
-            text = labels["preview"]!![isMyanmar]
+            text = textLabels["preview"]!![isMyanmar]
             setTextColor(Color.WHITE)
             textSize = 14f
             gravity = Gravity.CENTER
@@ -240,7 +247,6 @@ class MainActivity : ComponentActivity() {
             }
         })
 
-        // --- Boundary Fix: စာတန်းထိုးအား Preview အပြင်သို့ မထွက်စေရန် ကန့်သတ်ခြင်း ---
         subtitleOverlay.setOnTouchListener { view, event ->
             scaleGestureDetector.onTouchEvent(event)
             val parent = view.parent as View
@@ -251,11 +257,8 @@ class MainActivity : ComponentActivity() {
                         var newX = event.rawX + dX
                         var newY = event.rawY + dY
                         
-                        // X Boundary
                         if (newX < 0) newX = 0f
                         if (newX + view.width * scaleFactor > parent.width) newX = parent.width - view.width * scaleFactor
-                        
-                        // Y Boundary
                         if (newY < 0) newY = 0f
                         if (newY + view.height * scaleFactor > parent.height) newY = parent.height - view.height * scaleFactor
 
@@ -277,12 +280,12 @@ class MainActivity : ComponentActivity() {
         }
         
         btnToggleSub = Button(this).apply {
-            text = labels["sub_on"]!![isMyanmar]; isAllCaps = false; setTextColor(Color.WHITE); textSize = 12f
+            text = textLabels["sub_on"]!![isMyanmar]; isAllCaps = false; setTextColor(Color.WHITE); textSize = 12f
             background = GradientDrawable().apply { setColor(Color.parseColor("#1E293B")); cornerRadius = 15f }
             layoutParams = LinearLayout.LayoutParams(0, 100, 1f).apply { marginEnd = 10 }
         }
         btnToggleBg = Button(this).apply {
-            text = labels["box_on"]!![isMyanmar]; isAllCaps = false; setTextColor(Color.WHITE); textSize = 12f
+            text = textLabels["box_on"]!![isMyanmar]; isAllCaps = false; setTextColor(Color.WHITE); textSize = 12f
             background = GradientDrawable().apply { setColor(Color.parseColor("#1E293B")); cornerRadius = 15f }
             layoutParams = LinearLayout.LayoutParams(0, 100, 1f).apply { marginStart = 10 }
         }
@@ -290,13 +293,13 @@ class MainActivity : ComponentActivity() {
         btnToggleSub.setOnClickListener {
             isSubVisible = !isSubVisible
             subtitleOverlay.visibility = if (isSubVisible) View.VISIBLE else View.INVISIBLE
-            btnToggleSub.text = if (isSubVisible) labels["sub_on"]!![isMyanmar] else labels["sub_off"]!![isMyanmar]
+            btnToggleSub.text = if (isSubVisible) textLabels["sub_on"]!![isMyanmar] else textLabels["sub_off"]!![isMyanmar]
             btnToggleSub.setTextColor(if (isSubVisible) Color.WHITE else Color.GRAY)
         }
         btnToggleBg.setOnClickListener {
             isBgVisible = !isBgVisible
             subtitleOverlay.setBackgroundColor(if (isBgVisible) Color.parseColor("#99000000") else Color.TRANSPARENT)
-            btnToggleBg.text = if (isBgVisible) labels["box_on"]!![isMyanmar] else labels["box_off"]!![isMyanmar]
+            btnToggleBg.text = if (isBgVisible) textLabels["box_on"]!![isMyanmar] else textLabels["box_off"]!![isMyanmar]
             btnToggleBg.setTextColor(if (isBgVisible) Color.WHITE else Color.GRAY)
         }
         toggleRow.addView(btnToggleSub); toggleRow.addView(btnToggleBg)
@@ -308,7 +311,7 @@ class MainActivity : ComponentActivity() {
         }
 
         btnPickVideo = Button(this).apply {
-            text = labels["pick_vid"]!![isMyanmar]
+            text = textLabels["pick_vid"]!![isMyanmar]
             isAllCaps = false; setTextColor(Color.WHITE)
             background = GradientDrawable().apply { setColor(Color.parseColor("#2563EB")); cornerRadius = 20f }
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply { marginEnd = 10 }
@@ -316,7 +319,7 @@ class MainActivity : ComponentActivity() {
         }
 
         btnGenerate = Button(this).apply {
-            text = labels["gen_srt"]!![isMyanmar]
+            text = textLabels["gen_srt"]!![isMyanmar]
             isAllCaps = false; setTextColor(Color.WHITE)
             background = GradientDrawable(GradientDrawable.Orientation.TL_BR, intArrayOf(Color.parseColor("#00C6FF"), Color.parseColor("#0072FF"))).apply { cornerRadius = 20f }
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply { marginStart = 10 }
@@ -324,7 +327,7 @@ class MainActivity : ComponentActivity() {
         actionRow.addView(btnPickVideo); actionRow.addView(btnGenerate)
 
         btnExportVideo = Button(this).apply {
-            text = labels["export"]!![isMyanmar]
+            text = textLabels["export"]!![isMyanmar]
             isAllCaps = false; setTextColor(Color.WHITE); setTypeface(null, Typeface.BOLD)
             background = GradientDrawable(GradientDrawable.Orientation.TL_BR, intArrayOf(Color.parseColor("#F59E0B"), Color.parseColor("#D97706"))).apply { cornerRadius = 20f }
             layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { bottomMargin = 15 }
@@ -332,33 +335,37 @@ class MainActivity : ComponentActivity() {
         }
 
         statusText = TextView(this).apply {
-            text = labels["ready"]!![isMyanmar]
+            text = textLabels["ready"]!![isMyanmar]
             setTextColor(Color.parseColor("#94A3B8"))
             gravity = Gravity.CENTER
             textSize = 12f
             layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
         }
 
-        // Language Update Function
         btnLang.setOnClickListener {
             isMyanmar = !isMyanmar
             btnLang.text = if (isMyanmar) "🌐 English" else "🌐 မြန်မာ"
-            titleText.text = labels["title"]!![isMyanmar]
-            apiKeyInput.hint = labels["api_hint"]!![isMyanmar]
-            btnToggleSub.text = if (isSubVisible) labels["sub_on"]!![isMyanmar] else labels["sub_off"]!![isMyanmar]
-            btnToggleBg.text = if (isBgVisible) labels["box_on"]!![isMyanmar] else labels["box_off"]!![isMyanmar]
-            btnPickVideo.text = labels["pick_vid"]!![isMyanmar]
-            btnGenerate.text = labels["gen_srt"]!![isMyanmar]
-            btnExportVideo.text = labels["export"]!![isMyanmar]
+            titleText.text = textLabels["title"]!![isMyanmar]
+            apiKeyInput.hint = textLabels["api_hint"]!![isMyanmar]
+            btnToggleSub.text = if (isSubVisible) textLabels["sub_on"]!![isMyanmar] else textLabels["sub_off"]!![isMyanmar]
+            btnToggleBg.text = if (isBgVisible) textLabels["box_on"]!![isMyanmar] else textLabels["box_off"]!![isMyanmar]
+            btnPickVideo.text = textLabels["pick_vid"]!![isMyanmar]
+            btnGenerate.text = textLabels["gen_srt"]!![isMyanmar]
+            btnExportVideo.text = textLabels["export"]!![isMyanmar]
+            
             if (statusText.text.toString().contains("Ready") || statusText.text.toString().contains("အသင့်")) {
-                statusText.text = labels["ready"]!![isMyanmar]
+                statusText.text = textLabels["ready"]!![isMyanmar]
             }
             if (generatedSrtContent.isEmpty()) {
-                subtitleOverlay.text = labels["preview"]!![isMyanmar]
+                subtitleOverlay.text = textLabels["preview"]!![isMyanmar]
             }
+            
+            // Spinners ထဲက စာသားများကိုပါ ချက်ချင်းပြောင်းပေးမည်
+            setSpinnerAdapter(styleSpinner, arrayLabels["styles"]!![isMyanmar]!!)
+            setSpinnerAdapter(colorSpinner, arrayLabels["colors"]!![isMyanmar]!!)
+            setSpinnerAdapter(ratioSpinner, arrayLabels["ratios"]!![isMyanmar]!!)
         }
 
-        // --- GROQ API INTEGRATION (Whisper + Llama 3) ---
         btnGenerate.setOnClickListener {
             val apiKey = apiKeyInput.text.toString().trim()
             if (apiKey.isEmpty() || selectedVideoUri == null) {
@@ -389,7 +396,6 @@ class MainActivity : ComponentActivity() {
 
                     val client = OkHttpClient.Builder().connectTimeout(0, TimeUnit.SECONDS).readTimeout(0, TimeUnit.SECONDS).writeTimeout(0, TimeUnit.SECONDS).build()
                     
-                    // Step 1: Groq Whisper API (Speech to Text)
                     withContext(Dispatchers.Main) { statusText.text = if (isMyanmar) "🌐 Groq Whisper ဖြင့် စာသားထုတ်နေသည်..." else "🌐 Transcribing with Whisper..." }
                     
                     val requestBody = MultipartBody.Builder().setType(MultipartBody.FORM)
@@ -416,7 +422,6 @@ class MainActivity : ComponentActivity() {
                         return@launch
                     }
 
-                    // Step 2: Groq Llama 3 API (Translation to Myanmar)
                     withContext(Dispatchers.Main) { statusText.text = if (isMyanmar) "🌐 Llama 3 ဖြင့် ဘာသာပြန်နေသည်..." else "🌐 Translating with Llama 3..." }
                     
                     val llamaJson = JSONObject().apply {
@@ -506,7 +511,6 @@ class MainActivity : ComponentActivity() {
                     val boxStyle = if (isBgVisible) "BorderStyle=3,BackColour=&H80000000," else ""
                     val safeSrtPath = srtFile.absolutePath.replace("\\", "/").replace(":", "\\:")
                     
-                    // Ratio Filtering Logic for Export
                     val ratioFilter = when(selectedRatio) {
                         "16:9" -> "scale='if(gt(a,16/9),1280,-1)':'if(gt(a,16/9),-1,720)',pad=1280:720:(ow-iw)/2:(oh-ih)/2,"
                         "9:16" -> "scale='if(gt(a,9/16),720,-1)':'if(gt(a,9/16),-1,1280)',pad=720:1280:(ow-iw)/2:(oh-ih)/2,"
@@ -536,14 +540,14 @@ class MainActivity : ComponentActivity() {
                                 statusText.setTextColor(Color.parseColor("#EF4444"))
                             }
                             btnExportVideo.isEnabled = true
-                            btnExportVideo.text = labels["export"]!![isMyanmar]
+                            btnExportVideo.text = textLabels["export"]!![isMyanmar]
                         }
                     } else {
                         runOnUiThread {
                             statusText.text = if (isMyanmar) "❌ Rendering Failed! (Resolution / RAM မလောက်ငှခြင်း)" else "❌ Rendering Failed!"
                             statusText.setTextColor(Color.parseColor("#EF4444"))
                             btnExportVideo.isEnabled = true
-                            btnExportVideo.text = labels["export"]!![isMyanmar]
+                            btnExportVideo.text = textLabels["export"]!![isMyanmar]
                         }
                     }
                     try { inputVideoFile.delete(); srtFile.delete(); outputVideoFile.delete() } catch(e: Exception){}
@@ -552,7 +556,7 @@ class MainActivity : ComponentActivity() {
                     runOnUiThread { 
                         statusText.text = "❌ Error: ${e.message}" 
                         btnExportVideo.isEnabled = true
-                        btnExportVideo.text = labels["export"]!![isMyanmar]
+                        btnExportVideo.text = textLabels["export"]!![isMyanmar]
                     }
                 }
             }
@@ -571,8 +575,23 @@ class MainActivity : ComponentActivity() {
         setContentView(mainLayout)
     }
 
+    private fun setSpinnerAdapter(spinner: Spinner, items: Array<String>) {
+        val adapter = object : ArrayAdapter<String>(this@MainActivity, android.R.layout.simple_spinner_dropdown_item, items) {
+            override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
+                val view = super.getView(position, convertView, parent) as TextView
+                view.setTextColor(Color.WHITE); view.textSize = 11f; view.setPadding(15, 20, 15, 20); view.gravity = Gravity.CENTER
+                return view
+            }
+            override fun getDropDownView(position: Int, convertView: View?, parent: ViewGroup): View {
+                val view = super.getDropDownView(position, convertView, parent) as TextView
+                view.setTextColor(Color.parseColor("#E2E8F0")); view.setBackgroundColor(Color.parseColor("#151C2C")); view.setPadding(30, 30, 30, 30)
+                return view
+            }
+        }
+        spinner.adapter = adapter
+    }
+
     private fun updatePreviewRatio() {
-        val parent = videoView.parent as? FrameLayout ?: return
         val lp = videoView.layoutParams as FrameLayout.LayoutParams
         when (selectedRatio) {
             "16:9" -> { lp.width = ViewGroup.LayoutParams.MATCH_PARENT; lp.height = ViewGroup.LayoutParams.WRAP_CONTENT }
