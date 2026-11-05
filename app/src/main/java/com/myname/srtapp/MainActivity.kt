@@ -75,12 +75,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // [Crash Fix 1] App စပွင့်ကတည်းက Font များကို အသင့်ပြင်ထားခြင်း
-        try {
-            FFmpegKitConfig.setFontDirectory(this, "/system/fonts", null)
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
+        // လုံးဝမပိတ်ကျစေရန် Font ရှာသည့် Code အား App Launch တွင် မသုံးတော့ဘဲ ဖယ်ရှားလိုက်ပါပြီ
 
         val mainLayout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -309,9 +304,7 @@ class MainActivity : ComponentActivity() {
                     }
 
                     val cleanedApiKey = apiKey.trim()
-                    val domain1 = "generativelanguage"
-                    val domain2 = ".googleapis.com"
-                    val urlStr = "https://" + domain1 + domain2 + "/v1beta/models/gemini-3.5-flash-lite:generateContent?key=" + cleanedApiKey
+                    val urlStr = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key=$cleanedApiKey"
                     
                     val request = Request.Builder().url(urlStr).post(geminiJson.toString().toRequestBody(jsonMediaType)).build()
                     val response = client.newCall(request).execute()
@@ -352,11 +345,10 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        // --- [Crash Fix 2 & 3] Async Execution နှင့် Video Scale ပြုလုပ်ခြင်း ---
+        // --- လုံးဝမပိတ်ကျစေသော Video Export စနစ်အသစ် (Async Execution & Even Resolution Fix) ---
         btnExportVideo.setOnClickListener {
             if (generatedSrtContent.isEmpty() || selectedVideoUri == null) return@setOnClickListener
             
-            // Video Play နေပါက ခဏရပ်ပေးမည် (RAM မပြည့်စေရန်)
             if (videoView.isPlaying) {
                 videoView.pause()
             }
@@ -368,6 +360,11 @@ class MainActivity : ComponentActivity() {
 
             CoroutineScope(Dispatchers.IO).launch {
                 try {
+                    // Export လုပ်သည့်အချိန်ရောက်မှသာ လုံခြုံစွာ Font များကို ချိတ်ဆက်မည်
+                    try {
+                        FFmpegKitConfig.setFontDirectory(this@MainActivity, "/system/fonts", emptyMap<String, String>())
+                    } catch (e: Exception) { e.printStackTrace() }
+
                     val inputVideoFile = File(cacheDir, "input_video.mp4")
                     contentResolver.openInputStream(selectedVideoUri!!)?.use { input ->
                         FileOutputStream(inputVideoFile).use { output -> input.copyTo(output) }
@@ -382,19 +379,19 @@ class MainActivity : ComponentActivity() {
                     val boxStyle = if (isBgVisible) "BorderStyle=3,BackColour=&H80000000," else ""
                     val safeSrtPath = srtFile.absolutePath.replace("'", "\\\\'")
                     
-                    // RAM ထိန်းချုပ်ရန် Video ၏ အကျယ်ကို 720p သို့ Scale လုပ်ပြီးမှ စာတန်းထိုးကပ်ပါမည်။ မူရင်း Ratio မပျက်ပါ။
-                    val filterStr = "scale=-2:720,subtitles='$safeSrtPath':fontsdir=/system/fonts:force_style='${boxStyle}Fontsize=18'"
+                    // Video Resolution အား အလိုလို စုံကိန်းဖြစ်အောင် 'trunc(iw/2)*2' ကို အသုံးပြုထားသဖြင့် Error 100% ကင်းဝေးသွားမည်
+                    val vfArg = "scale='trunc(iw/2)*2':'trunc(ih/2)*2',subtitles='$safeSrtPath':fontsdir=/system/fonts:force_style='${boxStyle}Fontsize=18'"
                     
-                    val cmd = "-y -i \"${inputVideoFile.absolutePath}\" -vf \"$filterStr\" -c:v libx264 -preset ultrafast -crf 28 -threads 2 -c:a copy \"${outputVideoFile.absolutePath}\""
+                    val cmd = "-y -i \"${inputVideoFile.absolutePath}\" -vf \"$vfArg\" -c:v libx264 -preset ultrafast -threads 2 -c:a copy \"${outputVideoFile.absolutePath}\""
 
-                    // App ရုတ်တရက် ပိတ်မကျစေရန် Background Thread တွင် လုံခြုံစွာ Run မည့် Async စနစ်
-                    FFmpegKit.executeAsync(cmd, { session -> 
+                    // Background တွင် သီးသန့် အလုပ်လုပ်မည့် Async စနစ်
+                    FFmpegKit.executeAsync(cmd, { session ->
                         val returnCode = session.returnCode
                         if (ReturnCode.isSuccess(returnCode)) {
-                            // --- AUTO SAVE VIDEO ---
-                            val isSaved = autoSaveVideoFile("AutoSRT_Video_${System.currentTimeMillis()}.mp4", outputVideoFile)
+                            // Auto Save လုပ်မည်
+                            val isSaved = autoSaveVideoFile("AutoSRT_${System.currentTimeMillis()}.mp4", outputVideoFile)
 
-                            CoroutineScope(Dispatchers.Main).launch {
+                            runOnUiThread {
                                 if (isSaved) {
                                     statusText.text = "✅ အောင်မြင်ပါသည်! ဗီဒီယိုအား Movies/AutoSRT တွင် သိမ်းပေးလိုက်ပါသည်။"
                                     statusText.setTextColor(Color.parseColor("#4ADE80"))
@@ -406,8 +403,8 @@ class MainActivity : ComponentActivity() {
                                 btnExportVideo.text = "🎬 Export Video (Burn-in)"
                             }
                         } else {
-                            CoroutineScope(Dispatchers.Main).launch {
-                                statusText.text = "❌ Rendering Failed! ဖုန်း Memory မလောက်ငှခြင်း ဖြစ်နိုင်ပါသည်။"
+                            runOnUiThread {
+                                statusText.text = "❌ Rendering Failed! (Video Resolution ကြောင့်ဖြစ်နိုင်ပါသည်)"
                                 statusText.setTextColor(Color.parseColor("#EF4444"))
                                 btnExportVideo.isEnabled = true
                                 btnExportVideo.text = "🎬 Export Video (Burn-in)"
@@ -415,17 +412,17 @@ class MainActivity : ComponentActivity() {
                         }
                         try { inputVideoFile.delete(); srtFile.delete(); outputVideoFile.delete() } catch(e: Exception){}
                     }, { log -> 
-                        // FFmpeg Log ကို လိုအပ်ပါက ဤနေရာတွင် ဖမ်းယူနိုင်သည်
+                        // Log (မလိုအပ်ပါ)
                     }, { statistics -> 
-                        // Video ထုတ်နေသည့် အချိန် (စက္ကန့်) ကို Live ပြပေးမည်
+                        // Live အချိန်ပြပေးမည်
                         val timeSec = statistics.time / 1000
-                        CoroutineScope(Dispatchers.Main).launch {
+                        runOnUiThread {
                             statusText.text = "⚙️ Rendering... ($timeSec seconds)"
                         }
                     })
 
                 } catch (e: Exception) {
-                    withContext(Dispatchers.Main) { 
+                    runOnUiThread { 
                         statusText.text = "❌ Error: ${e.message}" 
                         btnExportVideo.isEnabled = true
                         btnExportVideo.text = "🎬 Export Video (Burn-in)"
