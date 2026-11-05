@@ -37,6 +37,7 @@ import org.json.JSONObject
 import java.io.File
 import java.io.FileOutputStream
 import java.nio.ByteBuffer
+import java.util.Locale
 import java.util.concurrent.TimeUnit
 
 class MainActivity : ComponentActivity() {
@@ -52,7 +53,6 @@ class MainActivity : ComponentActivity() {
     private lateinit var subtitleOverlay: TextView
     private lateinit var btnExportVideo: Button
     
-    // UI Elements
     private lateinit var titleText: TextView
     private lateinit var apiKeyInput: EditText
     private lateinit var btnToggleSub: Button
@@ -60,7 +60,6 @@ class MainActivity : ComponentActivity() {
     private lateinit var btnPickVideo: Button
     private lateinit var btnGenerate: Button
     
-    // Spinners
     private lateinit var styleSpinner: Spinner
     private lateinit var colorSpinner: Spinner
     private lateinit var ratioSpinner: Spinner
@@ -73,7 +72,6 @@ class MainActivity : ComponentActivity() {
     private var dX = 0f
     private var dY = 0f
 
-    // [Crash Fix] သီးသန့်ခွဲထုတ်ထားသော String Dictionary
     private val textLabels: Map<String, Map<Boolean, String>> = mapOf(
         "title" to mapOf(true to "AUTO SRT GEN", false to "AUTO SRT GEN"),
         "api_hint" to mapOf(true to "Groq API Key ထည့်ပါ", false to "Enter Groq API Key"),
@@ -88,7 +86,6 @@ class MainActivity : ComponentActivity() {
         "preview" to mapOf(true to "Subtitle Preview\n(လက်ဖြင့်ရွှေ့နိုင်၊ ချုံ့ချဲ့နိုင်ပါသည်)", false to "Subtitle Preview\n(Drag and zoom manually)")
     )
 
-    // [Crash Fix] သီးသန့်ခွဲထုတ်ထားသော Array Dictionary
     private val arrayLabels: Map<String, Map<Boolean, Array<String>>> = mapOf(
         "styles" to mapOf(
             true to arrayOf("ပုံမှန် (Standard)", "အလွတ်သဘော (Informal)", "အက်ရှင် (Action)", "ဟာသ (Comedy)"),
@@ -360,12 +357,12 @@ class MainActivity : ComponentActivity() {
                 subtitleOverlay.text = textLabels["preview"]!![isMyanmar]
             }
             
-            // Spinners ထဲက စာသားများကိုပါ ချက်ချင်းပြောင်းပေးမည်
             setSpinnerAdapter(styleSpinner, arrayLabels["styles"]!![isMyanmar]!!)
             setSpinnerAdapter(colorSpinner, arrayLabels["colors"]!![isMyanmar]!!)
             setSpinnerAdapter(ratioSpinner, arrayLabels["ratios"]!![isMyanmar]!!)
         }
 
+        // --- GROQ API INTEGRATION (Fixed Request Format) ---
         btnGenerate.setOnClickListener {
             val apiKey = apiKeyInput.text.toString().trim()
             if (apiKey.isEmpty() || selectedVideoUri == null) {
@@ -394,14 +391,19 @@ class MainActivity : ComponentActivity() {
                         return@launch
                     }
 
-                    val client = OkHttpClient.Builder().connectTimeout(0, TimeUnit.SECONDS).readTimeout(0, TimeUnit.SECONDS).writeTimeout(0, TimeUnit.SECONDS).build()
+                    val client = OkHttpClient.Builder()
+                        .connectTimeout(60, TimeUnit.SECONDS)
+                        .readTimeout(60, TimeUnit.SECONDS)
+                        .writeTimeout(60, TimeUnit.SECONDS)
+                        .build()
                     
                     withContext(Dispatchers.Main) { statusText.text = if (isMyanmar) "🌐 Groq Whisper ဖြင့် စာသားထုတ်နေသည်..." else "🌐 Transcribing with Whisper..." }
                     
+                    // [Fix] Groq API သည် 'srt' ကို လက်မခံပါ။ 'verbose_json' ကိုသုံးပြီး Manual SRT ပြောင်းပါမည်။
                     val requestBody = MultipartBody.Builder().setType(MultipartBody.FORM)
-                        .addFormDataPart("file", audioFile.name, audioFile.asRequestBody("audio/m4a".toMediaTypeOrNull()))
-                        .addFormDataPart("model", "whisper-large-v3")
-                        .addFormDataPart("response_format", "srt")
+                        .addFormDataPart("file", audioFile.name, audioFile.asRequestBody("audio/mp4".toMediaTypeOrNull()))
+                        .addFormDataPart("model", "whisper-large-v3-turbo") // ပိုမြန်သော Model ကို ပြောင်းသုံးထားသည်
+                        .addFormDataPart("response_format", "verbose_json")
                         .build()
 
                     val whisperRequest = Request.Builder()
@@ -411,11 +413,23 @@ class MainActivity : ComponentActivity() {
                         .build()
 
                     val whisperResponse = client.newCall(whisperRequest).execute()
-                    val englishSrt = whisperResponse.body?.string()
+                    val whisperResponseStr = whisperResponse.body?.string()
 
-                    if (!whisperResponse.isSuccessful || englishSrt.isNullOrEmpty() || englishSrt.contains("error")) {
+                    if (!whisperResponse.isSuccessful || whisperResponseStr.isNullOrEmpty() || whisperResponseStr.contains("\"error\"")) {
+                        val errMsg = try { JSONObject(whisperResponseStr ?: "").getJSONObject("error").getString("message") } catch(e:Exception){ "HTTP ${whisperResponse.code}" }
                         withContext(Dispatchers.Main) { 
-                            statusText.text = if (isMyanmar) "❌ Groq Whisper Error (API Key စစ်ဆေးပါ)" else "❌ Whisper Error (Check API Key)"
+                            statusText.text = if (isMyanmar) "❌ Whisper Error: $errMsg" else "❌ Whisper Error: $errMsg"
+                            statusText.setTextColor(Color.parseColor("#EF4444")) 
+                        }
+                        audioFile.delete()
+                        return@launch
+                    }
+
+                    val englishSrt = verboseJsonToSrt(whisperResponseStr)
+
+                    if (englishSrt.isEmpty()) {
+                        withContext(Dispatchers.Main) { 
+                            statusText.text = if (isMyanmar) "❌ စာသားထုတ်ယူမှု အဆင်မပြေပါ" else "❌ Transcription parsing failed"
                             statusText.setTextColor(Color.parseColor("#EF4444")) 
                         }
                         audioFile.delete()
@@ -472,7 +486,8 @@ class MainActivity : ComponentActivity() {
                             withContext(Dispatchers.Main) { statusText.text = "❌ Llama Translation Error"; statusText.setTextColor(Color.parseColor("#EF4444")) }
                         }
                     } else {
-                        withContext(Dispatchers.Main) { statusText.text = "❌ Groq Chat API Error"; statusText.setTextColor(Color.parseColor("#EF4444")) }
+                        val errMsg = try { JSONObject(llamaResponseStr ?: "").getJSONObject("error").getString("message") } catch(e:Exception){ "HTTP ${llamaResponse.code}" }
+                        withContext(Dispatchers.Main) { statusText.text = "❌ Groq Chat API Error: $errMsg"; statusText.setTextColor(Color.parseColor("#EF4444")) }
                     }
                     audioFile.delete()
                 } catch (e: Exception) {
@@ -574,6 +589,40 @@ class MainActivity : ComponentActivity() {
 
         setContentView(mainLayout)
     }
+
+    // --- JSON ကို SRT သို့ ပြောင်းပေးသည့် Function အသစ် ---
+    private fun verboseJsonToSrt(jsonStr: String?): String {
+        if (jsonStr == null) return ""
+        return try {
+            val root = JSONObject(jsonStr)
+            val segments = root.getJSONArray("segments")
+            val srtBuilder = StringBuilder()
+            for (i in 0 until segments.length()) {
+                val segment = segments.getJSONObject(i)
+                val start = segment.getDouble("start")
+                val end = segment.getDouble("end")
+                val text = segment.getString("text").trim()
+                
+                srtBuilder.append(i + 1).append("\n")
+                srtBuilder.append(formatSrtTime(start)).append(" --> ").append(formatSrtTime(end)).append("\n")
+                srtBuilder.append(text).append("\n\n")
+            }
+            srtBuilder.toString().trim()
+        } catch (e: Exception) {
+            e.printStackTrace()
+            ""
+        }
+    }
+
+    private fun formatSrtTime(seconds: Double): String {
+        val millis = (seconds * 1000).toLong()
+        val h = millis / 3600000
+        val m = (millis % 3600000) / 60000
+        val s = (millis % 60000) / 1000
+        val ms = millis % 1000
+        return String.format(Locale.US, "%02d:%02d:%02d,%03d", h, m, s, ms)
+    }
+    // -----------------------------------------------------
 
     private fun setSpinnerAdapter(spinner: Spinner, items: Array<String>) {
         val adapter = object : ArrayAdapter<String>(this@MainActivity, android.R.layout.simple_spinner_dropdown_item, items) {
