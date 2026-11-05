@@ -362,7 +362,6 @@ class MainActivity : ComponentActivity() {
             setSpinnerAdapter(ratioSpinner, arrayLabels["ratios"]!![isMyanmar]!!)
         }
 
-        // --- GROQ API INTEGRATION (Fixed Request Format) ---
         btnGenerate.setOnClickListener {
             val apiKey = apiKeyInput.text.toString().trim()
             if (apiKey.isEmpty() || selectedVideoUri == null) {
@@ -399,10 +398,9 @@ class MainActivity : ComponentActivity() {
                     
                     withContext(Dispatchers.Main) { statusText.text = if (isMyanmar) "🌐 Groq Whisper ဖြင့် စာသားထုတ်နေသည်..." else "🌐 Transcribing with Whisper..." }
                     
-                    // [Fix] Groq API သည် 'srt' ကို လက်မခံပါ။ 'verbose_json' ကိုသုံးပြီး Manual SRT ပြောင်းပါမည်။
                     val requestBody = MultipartBody.Builder().setType(MultipartBody.FORM)
                         .addFormDataPart("file", audioFile.name, audioFile.asRequestBody("audio/mp4".toMediaTypeOrNull()))
-                        .addFormDataPart("model", "whisper-large-v3-turbo") // ပိုမြန်သော Model ကို ပြောင်းသုံးထားသည်
+                        .addFormDataPart("model", "whisper-large-v3-turbo")
                         .addFormDataPart("response_format", "verbose_json")
                         .build()
 
@@ -438,8 +436,9 @@ class MainActivity : ComponentActivity() {
 
                     withContext(Dispatchers.Main) { statusText.text = if (isMyanmar) "🌐 Llama 3 ဖြင့် ဘာသာပြန်နေသည်..." else "🌐 Translating with Llama 3..." }
                     
+                    // [Bug Fix]: Changed decommissioned model to latest llama-3.3-70b-versatile
                     val llamaJson = JSONObject().apply {
-                        put("model", "llama3-70b-8192")
+                        put("model", "llama-3.3-70b-versatile")
                         put("messages", org.json.JSONArray().apply {
                             put(JSONObject().apply {
                                 put("role", "system")
@@ -590,7 +589,6 @@ class MainActivity : ComponentActivity() {
         setContentView(mainLayout)
     }
 
-    // --- JSON ကို SRT သို့ ပြောင်းပေးသည့် Function အသစ် ---
     private fun verboseJsonToSrt(jsonStr: String?): String {
         if (jsonStr == null) return ""
         return try {
@@ -622,7 +620,6 @@ class MainActivity : ComponentActivity() {
         val ms = millis % 1000
         return String.format(Locale.US, "%02d:%02d:%02d,%03d", h, m, s, ms)
     }
-    // -----------------------------------------------------
 
     private fun setSpinnerAdapter(spinner: Spinner, items: Array<String>) {
         val adapter = object : ArrayAdapter<String>(this@MainActivity, android.R.layout.simple_spinner_dropdown_item, items) {
