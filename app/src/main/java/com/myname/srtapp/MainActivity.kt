@@ -114,7 +114,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Root FrameLayout - No ScrollView
+        // Root FrameLayout - No ScrollView (Platinum Fixed Layout)
         rootLayout = FrameLayout(this).apply {
             layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
             setBackgroundColor(Color.parseColor("#090E17")) // Deep Platinum Dark Base
@@ -127,7 +127,7 @@ class MainActivity : ComponentActivity() {
             orientation = LinearLayout.VERTICAL
             layoutParams = FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT)
             setPadding(40, 50, 40, 50)
-            weightSum = 10f // Use weights for responsive fixed layout
+            weightSum = 10f 
         }
 
         // --- Top Bar (Weight: 1) ---
@@ -186,7 +186,7 @@ class MainActivity : ComponentActivity() {
             text = textLabels["title"]!![isMyanmar]
             textSize = 26f
             setTypeface(null, Typeface.BOLD)
-            setTextColor(Color.parseColor("#E2E8F0")) // Platinum text
+            setTextColor(Color.parseColor("#E2E8F0"))
             gravity = Gravity.CENTER_HORIZONTAL
         }
 
@@ -234,7 +234,7 @@ class MainActivity : ComponentActivity() {
             background = createGradientDrawable("#151C2C", "#151C2C", 20f, 1, "#334155")
             setPopupBackgroundDrawable(ColorDrawable(Color.parseColor("#1E293B")))
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f).apply { marginStart = 10 }
-            visibility = View.INVISIBLE // Reserve space, hide content initially
+            visibility = View.INVISIBLE 
         }
         setSpinnerAdapter(langSpinner, arrayLabels["sec_langs"]!![isMyanmar]!!)
 
@@ -303,7 +303,7 @@ class MainActivity : ComponentActivity() {
         btnPickVideo = Button(this).apply {
             text = textLabels["pick_vid"]!![isMyanmar]
             isAllCaps = false; setTextColor(Color.parseColor("#E2E8F0")); textSize = 14f
-            background = null // Transparent, container handles background
+            background = null
             layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
             setOnClickListener { pickVideoLauncher.launch("video/*") }
         }
@@ -334,7 +334,6 @@ class MainActivity : ComponentActivity() {
         btnGenerate = Button(this).apply {
             text = textLabels["gen_btn"]!![isMyanmar]
             isAllCaps = false; setTextColor(Color.WHITE); textSize = 16f; setTypeface(null, Typeface.BOLD)
-            // Platinum style gradient button
             background = createGradientDrawable("#3B82F6", "#1D4ED8", 25f, 0, "")
             layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 150).apply { bottomMargin = 20 }
             elevation = 8f
@@ -429,7 +428,7 @@ class MainActivity : ComponentActivity() {
         fileInfoCard.addView(folderIcon)
         fileInfoCard.addView(fileTextsLayout)
 
-        // Metadata Card (Weight 5.5) - This inner part can scroll
+        // Metadata Card (Weight 5.5)
         val resultMetaCard = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             background = createGradientDrawable("#151C2C", "#151C2C", 25f, 1, "#334155")
@@ -610,7 +609,7 @@ class MainActivity : ComponentActivity() {
                         """.trimIndent()
                     }
 
-                    // --- Content Moderation Rules Added ---
+                    // Content Moderation Prompt Active
                     val aiPrompt = """
                         STRICT INSTRUCTIONS: You are a professional subtitler. You MUST completely ignore the original language text and ONLY output the requested translations.
                         
@@ -681,7 +680,6 @@ class MainActivity : ComponentActivity() {
 
                             withContext(Dispatchers.Main) {
                                 if (srtSaved) {
-                                    // Switch to Result Screen (No scroll needed)
                                     mainContentLayout.visibility = View.GONE
                                     resultLayout.visibility = View.VISIBLE
 
@@ -724,6 +722,9 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    // ==========================================
+    // SETTINGS & TUTORIAL DIALOGS (5 APPS)
+    // ==========================================
     private fun showSettingsDialog() {
         val builder = android.app.AlertDialog.Builder(this)
         val layout = LinearLayout(this).apply {
@@ -733,39 +734,58 @@ class MainActivity : ComponentActivity() {
         }
 
         val title = TextView(this).apply {
-            text = "⚙️ Settings & Help"
+            text = "⚙️ SRT ထည့်သွင်းနည်းများ"
             textSize = 20f
             setTypeface(null, Typeface.BOLD)
             setTextColor(Color.WHITE)
             gravity = Gravity.CENTER
-            setPadding(0, 0, 0, 50)
+            setPadding(0, 0, 0, 40)
         }
-
-        val capcutBtn = Button(this).apply {
-            text = "🎬 CapCut တွင် SRT ဖိုင်ထည့်နည်း"
-            isAllCaps = false
-            setTextColor(Color.WHITE)
-            textSize = 14f
-            background = createGradientDrawable("#3B82F6", "#2563EB", 20f, 0, "")
-            setPadding(0, 40, 0, 40)
-        }
-
         layout.addView(title)
-        layout.addView(capcutBtn)
+
+        // ScrollView inside Dialog to hold multiple buttons cleanly
+        val scrollView = ScrollView(this).apply {
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
+        }
+        val btnContainer = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+        }
+
+        // App List and their Tutorials
+        val tutorials = listOf(
+            Pair("🎬 CapCut", "၁။ ဖုန်းထဲမှ CapCut ကို ဖွင့်ပြီး 'New Project' မှ ဗီဒီယိုကို ရွေးပါ။\n\n၂။ အောက်ခြေ Menu မှ 'Text' ကို နှိပ်ပါ။\n\n၃။ 'Subtitles' ကို နှိပ်ပြီး 'Local Subtitles' (သို့) 'Import' ကို ရွေးပါ။\n\n၄။ ဖုန်းထဲက Downloads/AutoSRT ဖိုဒါထဲရှိ .srt ဖိုင်ကို ရွေးထည့်ပါ။\n\n၅။ စာတန်းထိုးများ ပေါ်လာပါမည်။ Style တွင် စိတ်ကြိုက်ပြင်ပါ။"),
+            Pair("✂️ KineMaster", "၁။ KineMaster ကိုဖွင့်ပြီး New Project ဖြင့် ဗီဒီယိုကို Timeline ထဲထည့်ပါ။\n\n၂။ ညာဘက်အဝိုင်း Menu ထဲမှ 'Layer' ကိုနှိပ်ပြီး 'Text' (သို့) 'CC (Subtitles)' ကိုရွေးပါ။\n\n၃။ Import file ရွေးချယ်စရာထဲမှ Downloads/AutoSRT အောက်ရှိ .srt ဖိုင်ကို ရွေးချယ်ထည့်သွင်းပါ။\n\n၄။ စာတန်းများ Timeline ပေါ်ရောက်လာလျှင် ဖောင့်နှင့် အရောင်ပြောင်းနိုင်ပါသည်။"),
+            Pair("🎞️ VN Video Editor", "၁။ VN တွင် New Project ဖွင့်ပြီး ဗီဒီယိုထည့်ပါ။\n\n၂။ ဗီဒီယို Track အပေါ်ရှိ 'T' (Subtitle icon) ကို နှိပ်ပါ။\n\n၃။ 'Subtitle' ကိုရွေးပြီး 'Import from File App' ကို နှိပ်ပါ။\n\n၄။ AutoSRT ဖိုဒါထဲမှ လိုအပ်သော .srt ဖိုင်ကို ရွေးချယ်လိုက်ပါ။"),
+            Pair("🎥 VLLO", "၁။ VLLO ကိုဖွင့်၍ New Project ဖန်တီးပါ။\n\n၂။ အောက်ခြေ Menu တန်းမှ 'Text' ကို ရွေးချယ်ပါ။\n\n၃။ ဘယ်ဘက်ခြမ်းမှ 'Caption' ကို နှိပ်ပြီး 'SRT Import' ကို ရွေးပါ။\n\n၄။ ဖုန်းထဲတွင် သိမ်းထားသော .srt ဖိုင်ကို ရွေးချယ်ထည့်သွင်းပါ။"),
+            Pair("📹 LumaFusion", "၁။ LumaFusion တွင် ဗီဒီယိုကို Timeline ပေါ်သို့ တင်ပါ။\n\n၂။ ဘယ်ဘက်အပေါ်ရှိ Import icon မှတစ်ဆင့် 'Files' ကိုရွေးပြီး .srt ဖိုင်ကို Import လုပ်ပါ။\n\n၃။ ရလာသော SRT ဖိုင်ကို Timeline ၏ အပေါ်ဆုံးအလွှာသို့ ဆွဲတင် (Drag & Drop) လိုက်ပါ။")
+        )
+
+        for ((appName, steps) in tutorials) {
+            val appBtn = Button(this).apply {
+                text = "$appName တွင် ထည့်နည်း"
+                isAllCaps = false
+                setTextColor(Color.WHITE)
+                textSize = 14f
+                background = createGradientDrawable("#334155", "#475569", 20f, 0, "")
+                setPadding(0, 40, 0, 40)
+                layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { bottomMargin = 25 }
+                setOnClickListener {
+                    showAppTutorialDialog(appName, steps)
+                }
+            }
+            btnContainer.addView(appBtn)
+        }
+
+        scrollView.addView(btnContainer)
+        layout.addView(scrollView)
 
         builder.setView(layout)
         val dialog = builder.create()
         dialog.window?.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
-
-        capcutBtn.setOnClickListener {
-            dialog.dismiss()
-            showCapCutTutorialDialog()
-        }
-
         dialog.show()
     }
 
-    private fun showCapCutTutorialDialog() {
+    private fun showAppTutorialDialog(appName: String, stepsText: String) {
         val builder = android.app.AlertDialog.Builder(this)
         val layout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -774,19 +794,15 @@ class MainActivity : ComponentActivity() {
         }
 
         val title = TextView(this).apply {
-            text = "📱 CapCut တွင် ဖုန်းဖြင့် SRT ထည့်နည်း"
-            textSize = 16f
+            text = "$appName အသုံးပြုနည်း"
+            textSize = 18f
             setTypeface(null, Typeface.BOLD)
             setTextColor(Color.parseColor("#38BDF8"))
             setPadding(0, 0, 0, 40)
         }
 
         val steps = TextView(this).apply {
-            text = "၁။ ဖုန်းထဲမှ CapCut ကို ဖွင့်ပြီး 'New Project' ကနေ မိမိဗီဒီယိုကို ရွေးပါ။\n\n" +
-                   "၂။ အောက်ခြေ Menu တန်းမှ 'Text' ကို နှိပ်ပါ။\n\n" +
-                   "၃။ 'Auto Captions' (သို့မဟုတ်) 'Subtitles' ကို နှိပ်ပြီး 'Local Subtitles' ကို ရွေးပါ။\n\n" +
-                   "၄။ 'Import' ကို နှိပ်ပြီး ဖုန်းထဲက Downloads/AutoSRT ဖိုဒါထဲရှိ ခုနကထုတ်ထားသော .srt ဖိုင်ကို ရွေးထည့်ပါ။\n\n" +
-                   "၅။ ဗီဒီယိုပေါ်တွင် စာတန်းထိုးများ ပေါ်လာပါမည်။ အရောင်၊ ဖောင့်နှင့် အရွယ်အစားကို 'Style' ထဲတွင် စိတ်ကြိုက် ပြင်ဆင်နိုင်ပါသည်။"
+            text = stepsText
             textSize = 14f
             setTextColor(Color.parseColor("#E2E8F0"))
             setLineSpacing(0f, 1.4f)
@@ -810,10 +826,12 @@ class MainActivity : ComponentActivity() {
         dialog.window?.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
 
         closeBtn.setOnClickListener { dialog.dismiss() }
-
         dialog.show()
     }
 
+    // ==========================================
+    // UTILITY FUNCTIONS
+    // ==========================================
     private fun createGradientDrawable(startColor: String, endColor: String, radius: Float, strokeWidth: Int, strokeColor: String): GradientDrawable {
         val drawable = GradientDrawable(GradientDrawable.Orientation.TL_BR, intArrayOf(Color.parseColor(startColor), Color.parseColor(endColor)))
         drawable.cornerRadius = radius
