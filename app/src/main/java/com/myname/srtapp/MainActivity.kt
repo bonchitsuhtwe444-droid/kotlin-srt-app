@@ -37,7 +37,7 @@ class MainActivity : ComponentActivity() {
     private lateinit var statusText: TextView
     private var selectedVideoUri: Uri? = null
     private var selectedStyle = "Standard"
-    private var selectedPlatform = "YouTube" // Platform အသစ်အတွက်
+    private var selectedPlatform = "YouTube" 
 
     private lateinit var titleText: TextView
     private lateinit var subTitleText: TextView
@@ -48,7 +48,6 @@ class MainActivity : ComponentActivity() {
     private lateinit var platformSpinner: Spinner
     private lateinit var videoStatusText: TextView
     
-    // Metadata ရလဒ်ပြသမည့် နေရာများ
     private lateinit var metadataCard: LinearLayout
     private lateinit var metadataTitle: TextView
     private lateinit var metadataInput: EditText
@@ -91,7 +90,6 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // UI ကို အပေါ်အောက် ဆွဲနိုင်ရန် ScrollView ထည့်သွင်းခြင်း
         val scrollView = ScrollView(this).apply {
             layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
             isFillViewport = true
@@ -136,7 +134,6 @@ class MainActivity : ComponentActivity() {
             layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { bottomMargin = 60 }
         }
 
-        // Settings Card
         val settingsCard = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             background = createGradientDrawable("#1E293B", "#1E293B", 30f, 0, "")
@@ -186,7 +183,6 @@ class MainActivity : ComponentActivity() {
         settingsCard.addView(styleSpinner)
         settingsCard.addView(platformSpinner)
 
-        // Video Card
         val videoCard = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             background = createGradientDrawable("#1E293B", "#1E293B", 30f, 0, "")
@@ -215,7 +211,6 @@ class MainActivity : ComponentActivity() {
         videoCard.addView(btnPickVideo)
         videoCard.addView(videoStatusText)
 
-        // Generate Button
         btnGenerate = Button(this).apply {
             text = textLabels["gen_btn"]!![isMyanmar]
             isAllCaps = false; setTextColor(Color.WHITE); textSize = 16f; setTypeface(null, Typeface.BOLD)
@@ -225,7 +220,6 @@ class MainActivity : ComponentActivity() {
             elevation = 15f
         }
 
-        // Status
         val statusCard = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             background = createGradientDrawable("#0F172A", "#0F172A", 20f, 2, "#1E293B")
@@ -242,7 +236,6 @@ class MainActivity : ComponentActivity() {
         }
         statusCard.addView(statusText)
 
-        // Metadata Textbox Card (ကနဦးတွင် ပိတ်ထားမည်)
         metadataCard = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             background = createGradientDrawable("#1E293B", "#1E293B", 30f, 0, "")
@@ -313,7 +306,9 @@ class MainActivity : ComponentActivity() {
             CoroutineScope(Dispatchers.IO).launch {
                 try {
                     val audioFile = File(cacheDir, "extracted_audio.m4a")
-                    val extractSuccess = extractAudioFromVideo(selectedVideoUri!!, audioFile.absolutePath) { progress ->
+                    
+                    // Add explicit type Int to progress lambda to fix inference error
+                    val extractSuccess = extractAudioFromVideo(selectedVideoUri!!, audioFile.absolutePath) { progress: Int ->
                         withContext(Dispatchers.Main) { 
                             statusText.text = if (isMyanmar) "⏳ အသံထုတ်ယူနေသည်... ($progress%)" else "⏳ Extracting Audio... ($progress%)"
                             statusText.setTextColor(Color.parseColor("#FBBF24")) 
@@ -341,7 +336,6 @@ class MainActivity : ComponentActivity() {
                         
                     val jsonMediaType = "application/json; charset=utf-8".toMediaTypeOrNull()
                     
-                    // --- Platform ကိုပါ သေချာတိကျစွာ ခွဲခြားထုတ်ပေးမည့် Prompt ---
                     val aiPrompt = """
                         You are a professional subtitler and social media SEO expert.
                         Task 1: Generate a perfectly timed SRT file from the audio. Translate directly to Myanmar (Burmese) language using a $selectedStyle tone.
@@ -359,7 +353,7 @@ class MainActivity : ComponentActivity() {
                         [Write a suitable description/caption for $selectedPlatform]
                         
                         🏷️ Hashtags:
-                        [Write 5-10 trending hashtags suitable for $selectedPlatform]
+                        [Write trending hashtags suitable for $selectedPlatform]
                     """.trimIndent()
 
                     val geminiJson = JSONObject().apply {
@@ -389,4 +383,143 @@ class MainActivity : ComponentActivity() {
 
                             if (extractedText.contains("===METADATA===")) {
                                 val parts = extractedText.split("===METADATA===")
+                                srtContent = parts[0].replace("===SRT===", "").replace("```srt", "").replace("```", "").trim()
+                                metaContent = parts.getOrNull(1)?.replace("```txt", "")?.replace("```", "")?.trim() ?: ""
+                            } else {
+                                srtContent = extractedText.replace("```srt", "").replace("```", "").trim()
+                            }
+
+                            val timestamp = System.currentTimeMillis()
+                            val srtSaved = autoSaveFile("AutoSRT_$timestamp.srt", "application/x-subrip", srtContent)
+
+                            withContext(Dispatchers.Main) {
+                                if (srtSaved) {
+                                    statusText.text = if (isMyanmar) "🎉 အောင်မြင်ပါသည်!\nSRT အား Downloads/AutoSRT တွင် သိမ်းဆည်းပြီးပါပြီ။" else "🎉 Success!\nSaved SRT to Downloads/AutoSRT."
+                                    statusText.setTextColor(Color.parseColor("#4ADE80"))
+                                    
+                                    if (metaContent.isNotEmpty()) {
+                                        metadataCard.visibility = View.VISIBLE
+                                        metadataInput.setText(metaContent)
+                                        scrollView.post { scrollView.fullScroll(View.FOCUS_DOWN) }
+                                    }
+                                } else {
+                                    statusText.text = if (isMyanmar) "⚠️ ဖုန်းထဲသိမ်း၍မရပါ။ Storage Permission လိုအပ်ပါသည်။" else "⚠️ Save Failed. Storage Permission required."
+                                    statusText.setTextColor(Color.parseColor("#F59E0B"))
+                                }
+                            }
+                        } catch (e: Exception) {
+                            withContext(Dispatchers.Main) { statusText.text = "❌ Gemini Parsing Error"; statusText.setTextColor(Color.parseColor("#F87171")) }
+                        }
+                    } else {
+                        val errMsg = try { JSONObject(responseStr ?: "").getJSONObject("error").getString("message") } catch(e:Exception){ "HTTP ${response.code}" }
+                        withContext(Dispatchers.Main) { statusText.text = "❌ API Error: $errMsg"; statusText.setTextColor(Color.parseColor("#F87171")) }
+                    }
+                    audioFile.delete()
+                } catch (e: Exception) {
+                    withContext(Dispatchers.Main) { statusText.text = "❌ Error: ${e.message}"; statusText.setTextColor(Color.parseColor("#F87171")) }
+                } finally {
+                    withContext(Dispatchers.Main) { btnGenerate.isEnabled = true; btnGenerate.alpha = 1.0f }
+                }
+            }
+        }
+
+        mainLayout.addView(topBar)
+        mainLayout.addView(titleText)
+        mainLayout.addView(subTitleText)
+        mainLayout.addView(settingsCard)
+        mainLayout.addView(videoCard)
+        mainLayout.addView(btnGenerate)
+        mainLayout.addView(statusCard)
+        mainLayout.addView(metadataCard)
+
+        scrollView.addView(mainLayout)
+        setContentView(scrollView)
+    }
+
+    // HELPER FUNCTIONS (These must be inside the class)
+    
+    private fun createGradientDrawable(startColor: String, endColor: String, radius: Float, strokeWidth: Int, strokeColor: String): GradientDrawable {
+        val drawable = GradientDrawable(GradientDrawable.Orientation.TL_BR, intArrayOf(Color.parseColor(startColor), Color.parseColor(endColor)))
+        drawable.cornerRadius = radius
+        if (strokeWidth > 0 && strokeColor.isNotEmpty()) {
+            drawable.setStroke(strokeWidth, Color.parseColor(strokeColor))
+        }
+        return drawable
+    }
+
+    private fun setSpinnerAdapter(spinner: Spinner, items: Array<String>) {
+        val adapter = object : ArrayAdapter<String>(this@MainActivity, android.R.layout.simple_spinner_dropdown_item, items) {
+            override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
+                val view = super.getView(position, convertView, parent) as TextView
+                view.setTextColor(Color.WHITE); view.textSize = 14f; view.setPadding(20, 30, 20, 30)
+                return view
+            }
+            override fun getDropDownView(position: Int, convertView: View?, parent: ViewGroup): View {
+                val view = super.getDropDownView(position, convertView, parent) as TextView
+                view.setTextColor(Color.parseColor("#E2E8F0")); view.setBackgroundColor(Color.parseColor("#1E293B")); view.setPadding(40, 40, 40, 40)
+                return view
+            }
+        }
+        spinner.adapter = adapter
+    }
+
+    private fun autoSaveFile(fileName: String, mimeType: String, content: String): Boolean {
+        return try {
+            val values = ContentValues().apply {
+                put(MediaStore.MediaColumns.DISPLAY_NAME, fileName)
+                put(MediaStore.MediaColumns.MIME_TYPE, mimeType)
+                put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS + "/AutoSRT")
+            }
+            val uri = contentResolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
+            if (uri != null) {
+                contentResolver.openOutputStream(uri)?.use { it.write(content.toByteArray()) }
+                true
+            } else false
+        } catch (e: Exception) {
+            e.printStackTrace()
+            false
+        }
+    }
+
+    private suspend fun extractAudioFromVideo(videoUri: Uri, outputPath: String, onProgress: suspend (Int) -> Unit): Boolean {
+        val extractor = MediaExtractor()
+        try {
+            contentResolver.openFileDescriptor(videoUri, "r")?.fileDescriptor?.let { extractor.setDataSource(it) } ?: return false
+
+            var audioTrackIndex = -1
+            for (i in 0 until extractor.trackCount) {
+                val format = extractor.getTrackFormat(i)
+                if (format.getString(MediaFormat.KEY_MIME)?.startsWith("audio/") == true) { audioTrackIndex = i; break }
+            }
+            if (audioTrackIndex == -1) return false
+
+            extractor.selectTrack(audioTrackIndex)
+            val format = extractor.getTrackFormat(audioTrackIndex)
+            val durationUs = try { format.getLong(MediaFormat.KEY_DURATION) } catch (e: Exception) { 0L }
             
+            val muxer = MediaMuxer(outputPath, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
+            val muxerTrackIndex = muxer.addTrack(format)
+            muxer.start()
+
+            val bufferSize = try { val size = format.getInteger(MediaFormat.KEY_MAX_INPUT_SIZE); if (size > 0) size else 1024 * 1024 } catch (e: Exception) { 1024 * 1024 }
+            val buffer = ByteBuffer.allocate(bufferSize)
+            val bufferInfo = MediaCodec.BufferInfo()
+            var lastProgress = -1
+
+            while (true) {
+                val sampleSize = extractor.readSampleData(buffer, 0)
+                if (sampleSize < 0) break
+                bufferInfo.offset = 0; bufferInfo.size = sampleSize; bufferInfo.flags = extractor.sampleFlags; bufferInfo.presentationTimeUs = extractor.sampleTime
+                if (durationUs > 0) {
+                    val progress = ((bufferInfo.presentationTimeUs.toDouble() / durationUs.toDouble()) * 100).toInt()
+                    if (progress > lastProgress && progress <= 100) { onProgress(progress); lastProgress = progress }
+                }
+                muxer.writeSampleData(muxerTrackIndex, buffer, bufferInfo)
+                extractor.advance()
+            }
+            
+            onProgress(100); muxer.stop(); muxer.release(); extractor.release()
+            return true
+        } catch (e: Exception) { e.printStackTrace(); return false }
+    }
+}
