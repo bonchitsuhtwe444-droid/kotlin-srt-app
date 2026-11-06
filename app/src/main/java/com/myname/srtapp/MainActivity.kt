@@ -114,13 +114,26 @@ class MainActivity : ComponentActivity() {
         val mainLayout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
-            setPadding(50, 70, 50, 70)
+            setPadding(50, 60, 50, 70)
         }
 
+        // Top Bar (Language + Settings)
         val topBar = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.END
+            gravity = Gravity.CENTER_VERTICAL or Gravity.END
             layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { bottomMargin = 40 }
+        }
+        
+        val topSpacer = View(this).apply { layoutParams = LinearLayout.LayoutParams(0, 1, 1f) }
+        
+        val btnSettings = Button(this).apply {
+            text = "⚙️"
+            setTextColor(Color.WHITE)
+            textSize = 14f
+            background = createGradientDrawable("#1E293B", "#1E293B", 20f, 2, "#475569")
+            setPadding(20, 10, 20, 10)
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, 110).apply { marginEnd = 20 }
+            setOnClickListener { showSettingsDialog() }
         }
         
         val btnLang = Button(this).apply {
@@ -128,8 +141,11 @@ class MainActivity : ComponentActivity() {
             isAllCaps = false; setTextColor(Color.WHITE); textSize = 12f
             background = createGradientDrawable("#1E293B", "#1E293B", 20f, 2, "#475569")
             setPadding(30, 10, 30, 10)
-            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, 100)
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, 110)
         }
+        
+        topBar.addView(topSpacer)
+        topBar.addView(btnSettings)
         topBar.addView(btnLang)
 
         titleText = TextView(this).apply {
@@ -187,7 +203,6 @@ class MainActivity : ComponentActivity() {
         modeSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
             override fun onItemSelected(p0: AdapterView<*>?, p1: View?, pos: Int, p3: Long) {
                 selectedMode = if (pos == 1) "Dual" else "Normal"
-                // Dual Mode ဆိုရင် Language ရွေးတဲ့ Spinner ပေါ်လာမယ်
                 langSpinner.visibility = if (selectedMode == "Dual") View.VISIBLE else View.GONE
             }
             override fun onNothingSelected(p0: AdapterView<*>?) {}
@@ -234,7 +249,7 @@ class MainActivity : ComponentActivity() {
         
         settingsCard.addView(apiKeyInput)
         settingsCard.addView(modeSpinner)
-        settingsCard.addView(langSpinner) // Adds right below mode
+        settingsCard.addView(langSpinner)
         settingsCard.addView(styleSpinner)
         settingsCard.addView(platformSpinner)
 
@@ -393,25 +408,29 @@ class MainActivity : ComponentActivity() {
                         
                     val jsonMediaType = "application/json; charset=utf-8".toMediaTypeOrNull()
                     
-                    // --- Dynamic SRT Task (Normal vs Dual Mode) ---
+                    // --- AI ကို အတင်းအကျပ် ဘာသာပြန်ခိုင်းမည့် တိကျသော Prompt အသစ် (Language Leak ကာကွယ်ရန်) ---
                     val srtTaskInstruction = if (selectedMode == "Dual") {
                         """
-                        Task 1: Generate a perfectly timed SRT file from the audio. 
-                        For EVERY subtitle block, provide exactly TWO lines of text: 
-                        The first line MUST be in $selectedSecLang language, and the second line MUST be the direct translation in Myanmar (Burmese) language using a $selectedStyle tone. 
-                        Separate them with a single line break.
+                        For EVERY subtitle block, provide EXACTLY TWO lines of text:
+                        Line 1: Translated directly into $selectedSecLang language.
+                        Line 2: Translated directly into Myanmar (Burmese) language using a $selectedStyle tone.
+                        CRITICAL: DO NOT output the original spoken language (e.g. Chinese characters) unless it is EXACTLY the requested target language.
                         """.trimIndent()
                     } else {
                         """
-                        Task 1: Generate a perfectly timed SRT file from the audio. Translate directly to Myanmar (Burmese) language using a $selectedStyle tone.
+                        For EVERY subtitle block, translate the spoken words directly into Myanmar (Burmese) language using a $selectedStyle tone.
+                        CRITICAL: Output ONLY in Myanmar script. DO NOT output Chinese characters or the original spoken language.
                         """.trimIndent()
                     }
                     
                     val aiPrompt = """
-                        You are a professional subtitler and social media SEO expert.
+                        STRICT INSTRUCTIONS: You are a professional subtitler. You MUST completely ignore the original language text and ONLY output the requested translations. If you output original language text (like Chinese characters) when Burmese or English is requested, you fail.
+                        
+                        Task 1: Generate a perfectly timed SRT file from the audio.
                         $srtTaskInstruction
                         
-                        Task 2: Generate highly engaging SEO metadata specifically optimized for $selectedPlatform in Myanmar (Burmese) language based on the video context.
+                        Task 2: Generate highly engaging SEO metadata specifically optimized for $selectedPlatform.
+                        CRITICAL: The Titles, Description, and Hashtags MUST be written ENTIRELY in Myanmar (Burmese) language. No other languages allowed here.
                         
                         You MUST return your EXACT response in the following format with delimiters:
                         
@@ -419,13 +438,13 @@ class MainActivity : ComponentActivity() {
                         [Insert raw SRT text here]
                         ===METADATA===
                         📌 $selectedPlatform Title:
-                        [Write 2-3 engaging titles for $selectedPlatform]
+                        [Write 2-3 engaging titles in Myanmar (Burmese) language]
                         
                         📝 Description / Caption:
-                        [Write a suitable description/caption for $selectedPlatform]
+                        [Write a description in Myanmar (Burmese) language]
                         
                         🏷️ Hashtags:
-                        [Write trending hashtags suitable for $selectedPlatform]
+                        [Write trending hashtags in Myanmar (Burmese) language]
                     """.trimIndent()
 
                     val geminiJson = JSONObject().apply {
@@ -507,7 +526,99 @@ class MainActivity : ComponentActivity() {
         scrollView.addView(mainLayout)
         setContentView(scrollView)
     }
+
+    // --- Settings / CapCut Tutorial Dialogs ---
+    private fun showSettingsDialog() {
+        val builder = android.app.AlertDialog.Builder(this)
+        val layout = LinearLayout(this).apply { 
+            orientation = LinearLayout.VERTICAL
+            setPadding(50, 60, 50, 60)
+            setBackgroundColor(Color.parseColor("#1E293B"))
+        }
+        
+        val title = TextView(this).apply {
+            text = "⚙️ Settings"
+            textSize = 22f
+            setTypeface(null, Typeface.BOLD)
+            setTextColor(Color.WHITE)
+            gravity = Gravity.CENTER
+            setPadding(0, 0, 0, 50)
+        }
+        
+        val capcutBtn = Button(this).apply {
+            text = "🎬 CapCut တွင် SRT ဖိုင်ထည့်နည်း"
+            isAllCaps = false
+            setTextColor(Color.WHITE)
+            textSize = 15f
+            background = createGradientDrawable("#3B82F6", "#2563EB", 20f, 0, "")
+            setPadding(0, 40, 0, 40)
+        }
+        
+        layout.addView(title)
+        layout.addView(capcutBtn)
+        
+        builder.setView(layout)
+        val dialog = builder.create()
+        dialog.window?.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
+        
+        capcutBtn.setOnClickListener {
+            dialog.dismiss()
+            showCapCutTutorialDialog()
+        }
+        
+        dialog.show()
+    }
     
+    private fun showCapCutTutorialDialog() {
+        val builder = android.app.AlertDialog.Builder(this)
+        val layout = LinearLayout(this).apply { 
+            orientation = LinearLayout.VERTICAL
+            setPadding(50, 60, 50, 60)
+            setBackgroundColor(Color.parseColor("#1E293B"))
+        }
+        
+        val title = TextView(this).apply {
+            text = "📱 CapCut တွင် ဖုန်းဖြင့် SRT ထည့်နည်း"
+            textSize = 18f
+            setTypeface(null, Typeface.BOLD)
+            setTextColor(Color.parseColor("#38BDF8"))
+            setPadding(0, 0, 0, 40)
+        }
+        
+        val steps = TextView(this).apply {
+            text = "၁။ ဖုန်းထဲမှ CapCut ကို ဖွင့်ပြီး 'New Project' ကနေ မိမိဗီဒီယိုကို ရွေးပါ။\n\n" +
+                   "၂။ အောက်ခြေ Menu တန်းမှ 'Text' ကို နှိပ်ပါ။\n\n" +
+                   "၃။ 'Auto Captions' (သို့မဟုတ်) 'Subtitles' ကို နှိပ်ပြီး 'Local Subtitles' ကို ရွေးပါ။\n\n" +
+                   "၄။ 'Import' ကို နှိပ်ပြီး ဖုန်းထဲက Downloads/AutoSRT ဖိုဒါထဲရှိ ခုနကထုတ်ထားသော .srt ဖိုင်ကို ရွေးထည့်ပါ။\n\n" +
+                   "၅။ ဗီဒီယိုပေါ်တွင် စာတန်းထိုးများ ပေါ်လာပါမည်။ အရောင်၊ ဖောင့်နှင့် အရွယ်အစားကို 'Style' ထဲတွင် စိတ်ကြိုက် ပြင်ဆင်နိုင်ပါသည်။"
+            textSize = 15f
+            setTextColor(Color.parseColor("#E2E8F0"))
+            setLineSpacing(0f, 1.4f)
+        }
+        
+        val closeBtn = Button(this).apply {
+            text = "နားလည်ပါပြီ"
+            isAllCaps = false
+            setTextColor(Color.WHITE)
+            background = createGradientDrawable("#10B981", "#059669", 20f, 0, "")
+            setPadding(0, 35, 0, 35)
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { topMargin = 50 }
+        }
+        
+        layout.addView(title)
+        layout.addView(steps)
+        layout.addView(closeBtn)
+        
+        builder.setView(layout)
+        val dialog = builder.create()
+        dialog.window?.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
+        
+        closeBtn.setOnClickListener { dialog.dismiss() }
+        
+        dialog.show()
+    }
+    
+    // --- Helper Functions ---
     private fun createGradientDrawable(startColor: String, endColor: String, radius: Float, strokeWidth: Int, strokeColor: String): GradientDrawable {
         val drawable = GradientDrawable(GradientDrawable.Orientation.TL_BR, intArrayOf(Color.parseColor(startColor), Color.parseColor(endColor)))
         drawable.cornerRadius = radius
