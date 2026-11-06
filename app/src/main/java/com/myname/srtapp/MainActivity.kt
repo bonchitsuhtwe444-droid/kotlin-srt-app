@@ -114,10 +114,9 @@ class MainActivity : ComponentActivity() {
         val mainLayout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
-            setPadding(50, 60, 50, 70)
+            setPadding(50, 70, 50, 70)
         }
 
-        // Top Bar (Language + Settings)
         val topBar = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL or Gravity.END
@@ -165,7 +164,6 @@ class MainActivity : ComponentActivity() {
             layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { bottomMargin = 60 }
         }
 
-        // Settings Card
         val settingsCard = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             background = createGradientDrawable("#1E293B", "#1E293B", 30f, 0, "")
@@ -186,17 +184,17 @@ class MainActivity : ComponentActivity() {
         }
 
         modeSpinner = Spinner(this).apply {
-            background = createGradientDrawable("#0F172A", "#0F172A", 20f, 2, "#3B82F6") // Highlight Mode Spinner
+            background = createGradientDrawable("#0F172A", "#0F172A", 20f, 2, "#3B82F6") 
             setPopupBackgroundDrawable(ColorDrawable(Color.parseColor("#1E293B")))
             layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { bottomMargin = 30 }
         }
         setSpinnerAdapter(modeSpinner, arrayLabels["modes"]!![isMyanmar]!!)
         
         langSpinner = Spinner(this).apply {
-            background = createGradientDrawable("#0F172A", "#0F172A", 20f, 2, "#10B981") // Green border for language
+            background = createGradientDrawable("#0F172A", "#0F172A", 20f, 2, "#10B981") 
             setPopupBackgroundDrawable(ColorDrawable(Color.parseColor("#1E293B")))
             layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { bottomMargin = 30 }
-            visibility = View.GONE // Default Hide
+            visibility = View.GONE 
         }
         setSpinnerAdapter(langSpinner, arrayLabels["sec_langs"]!![isMyanmar]!!)
         
@@ -253,7 +251,6 @@ class MainActivity : ComponentActivity() {
         settingsCard.addView(styleSpinner)
         settingsCard.addView(platformSpinner)
 
-        // Video Card
         val videoCard = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             background = createGradientDrawable("#1E293B", "#1E293B", 30f, 0, "")
@@ -408,34 +405,44 @@ class MainActivity : ComponentActivity() {
                         
                     val jsonMediaType = "application/json; charset=utf-8".toMediaTypeOrNull()
                     
-                    // --- AI ကို အတင်းအကျပ် ဘာသာပြန်ခိုင်းမည့် တိကျသော Prompt အသစ် (Language Leak ကာကွယ်ရန်) ---
+                    // --- AI ကို CapCut တွင် အတိအကျဖတ်နိုင်သော SRT ဖိုင်ပုံစံ ထုတ်ပေးရန် Prompt ---
                     val srtTaskInstruction = if (selectedMode == "Dual") {
                         """
                         For EVERY subtitle block, provide EXACTLY TWO lines of text:
                         Line 1: Translated directly into $selectedSecLang language.
                         Line 2: Translated directly into Myanmar (Burmese) language using a $selectedStyle tone.
-                        CRITICAL: DO NOT output the original spoken language (e.g. Chinese characters) unless it is EXACTLY the requested target language.
+                        CRITICAL SRT FORMATTING FOR CAPCUT:
+                        - Format must be standard SubRip (.srt).
+                        - No extra empty lines within a single subtitle block.
+                        - Just ONE line break between Line 1 and Line 2.
+                        - Do NOT add multiple line breaks inside Burmese text.
+                        - Use standard time format: 00:00:00,000 --> 00:00:00,000
                         """.trimIndent()
                     } else {
                         """
                         For EVERY subtitle block, translate the spoken words directly into Myanmar (Burmese) language using a $selectedStyle tone.
-                        CRITICAL: Output ONLY in Myanmar script. DO NOT output Chinese characters or the original spoken language.
+                        CRITICAL SRT FORMATTING FOR CAPCUT:
+                        - Format must be standard SubRip (.srt).
+                        - No extra empty lines within a single subtitle block.
+                        - Provide the translation in a single continuous line or max 2 lines. Do NOT break the Burmese text into many short lines.
+                        - Output ONLY in Myanmar script.
+                        - Use standard time format: 00:00:00,000 --> 00:00:00,000
                         """.trimIndent()
                     }
                     
                     val aiPrompt = """
-                        STRICT INSTRUCTIONS: You are a professional subtitler. You MUST completely ignore the original language text and ONLY output the requested translations. If you output original language text (like Chinese characters) when Burmese or English is requested, you fail.
+                        STRICT INSTRUCTIONS: You are a professional subtitler. You MUST completely ignore the original language text and ONLY output the requested translations.
                         
                         Task 1: Generate a perfectly timed SRT file from the audio.
                         $srtTaskInstruction
                         
                         Task 2: Generate highly engaging SEO metadata specifically optimized for $selectedPlatform.
-                        CRITICAL: The Titles, Description, and Hashtags MUST be written ENTIRELY in Myanmar (Burmese) language. No other languages allowed here.
+                        CRITICAL: The Titles, Description, and Hashtags MUST be written ENTIRELY in Myanmar (Burmese) language.
                         
                         You MUST return your EXACT response in the following format with delimiters:
                         
                         ===SRT===
-                        [Insert raw SRT text here]
+                        [Insert raw SRT text here following the strict CapCut format]
                         ===METADATA===
                         📌 $selectedPlatform Title:
                         [Write 2-3 engaging titles in Myanmar (Burmese) language]
@@ -479,6 +486,9 @@ class MainActivity : ComponentActivity() {
                             } else {
                                 srtContent = extractedText.replace("```srt", "").replace("```", "").trim()
                             }
+
+                            // Clean up excessive blank lines to ensure CapCut compatibility
+                            srtContent = srtContent.replace(Regex("\n{3,}"), "\n\n")
 
                             val timestamp = System.currentTimeMillis()
                             val srtSaved = autoSaveFile("AutoSRT_$timestamp.srt", "application/x-subrip", srtContent)
@@ -527,7 +537,6 @@ class MainActivity : ComponentActivity() {
         setContentView(scrollView)
     }
 
-    // --- Settings / CapCut Tutorial Dialogs ---
     private fun showSettingsDialog() {
         val builder = android.app.AlertDialog.Builder(this)
         val layout = LinearLayout(this).apply { 
@@ -618,7 +627,6 @@ class MainActivity : ComponentActivity() {
         dialog.show()
     }
     
-    // --- Helper Functions ---
     private fun createGradientDrawable(startColor: String, endColor: String, radius: Float, strokeWidth: Int, strokeColor: String): GradientDrawable {
         val drawable = GradientDrawable(GradientDrawable.Orientation.TL_BR, intArrayOf(Color.parseColor(startColor), Color.parseColor(endColor)))
         drawable.cornerRadius = radius
