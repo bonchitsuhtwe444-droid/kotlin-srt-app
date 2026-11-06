@@ -36,9 +36,14 @@ class MainActivity : ComponentActivity() {
 
     private lateinit var statusText: TextView
     private var selectedVideoUri: Uri? = null
+    
+    // Settings Parameters
     private var selectedStyle = "Standard"
     private var selectedPlatform = "YouTube" 
+    private var selectedMode = "Normal"
+    private var selectedSecLang = "English"
 
+    // UI Elements
     private lateinit var titleText: TextView
     private lateinit var subTitleText: TextView
     private lateinit var apiKeyInput: EditText
@@ -46,6 +51,8 @@ class MainActivity : ComponentActivity() {
     private lateinit var btnGenerate: Button
     private lateinit var styleSpinner: Spinner
     private lateinit var platformSpinner: Spinner
+    private lateinit var modeSpinner: Spinner
+    private lateinit var langSpinner: Spinner
     private lateinit var videoStatusText: TextView
     
     private lateinit var metadataCard: LinearLayout
@@ -74,6 +81,14 @@ class MainActivity : ComponentActivity() {
         "platforms" to mapOf(
             true to arrayOf("▶️ YouTube အတွက်", "🎵 TikTok အတွက်", "📘 Facebook အတွက်"),
             false to arrayOf("▶️ For YouTube", "🎵 For TikTok", "📘 For Facebook")
+        ),
+        "modes" to mapOf(
+            true to arrayOf("📄 Normal Mode (မြန်မာသီးသန့်)", "📑 Dual Subtitles (၂ မျိုးတွဲ)"),
+            false to arrayOf("📄 Normal Mode (Myanmar Only)", "📑 Dual Subtitles (Bilingual)")
+        ),
+        "sec_langs" to mapOf(
+            true to arrayOf("🇬🇧 + အင်္ဂလိပ် (English) တွဲမည်", "🇨🇳 + တရုတ် (Chinese) တွဲမည်", "🇰🇷 + ကိုရီးယား (Korean) တွဲမည်", "🇯🇵 + ဂျပန် (Japanese) တွဲမည်", "🇹🇭 + ထိုင်း (Thai) တွဲမည်"),
+            false to arrayOf("🇬🇧 + English", "🇨🇳 + Chinese", "🇰🇷 + Korean", "🇯🇵 + Japanese", "🇹🇭 + Thai")
         )
     )
 
@@ -134,6 +149,7 @@ class MainActivity : ComponentActivity() {
             layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { bottomMargin = 60 }
         }
 
+        // Settings Card
         val settingsCard = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             background = createGradientDrawable("#1E293B", "#1E293B", 30f, 0, "")
@@ -151,6 +167,43 @@ class MainActivity : ComponentActivity() {
             background = createGradientDrawable("#0F172A", "#0F172A", 20f, 2, "#334155")
             setPadding(40, 40, 40, 40)
             layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { bottomMargin = 30 }
+        }
+
+        modeSpinner = Spinner(this).apply {
+            background = createGradientDrawable("#0F172A", "#0F172A", 20f, 2, "#3B82F6") // Highlight Mode Spinner
+            setPopupBackgroundDrawable(ColorDrawable(Color.parseColor("#1E293B")))
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { bottomMargin = 30 }
+        }
+        setSpinnerAdapter(modeSpinner, arrayLabels["modes"]!![isMyanmar]!!)
+        
+        langSpinner = Spinner(this).apply {
+            background = createGradientDrawable("#0F172A", "#0F172A", 20f, 2, "#10B981") // Green border for language
+            setPopupBackgroundDrawable(ColorDrawable(Color.parseColor("#1E293B")))
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { bottomMargin = 30 }
+            visibility = View.GONE // Default Hide
+        }
+        setSpinnerAdapter(langSpinner, arrayLabels["sec_langs"]!![isMyanmar]!!)
+        
+        modeSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(p0: AdapterView<*>?, p1: View?, pos: Int, p3: Long) {
+                selectedMode = if (pos == 1) "Dual" else "Normal"
+                // Dual Mode ဆိုရင် Language ရွေးတဲ့ Spinner ပေါ်လာမယ်
+                langSpinner.visibility = if (selectedMode == "Dual") View.VISIBLE else View.GONE
+            }
+            override fun onNothingSelected(p0: AdapterView<*>?) {}
+        }
+        
+        langSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(p0: AdapterView<*>?, p1: View?, pos: Int, p3: Long) {
+                selectedSecLang = when(pos) { 
+                    1 -> "Chinese"
+                    2 -> "Korean"
+                    3 -> "Japanese"
+                    4 -> "Thai"
+                    else -> "English"
+                }
+            }
+            override fun onNothingSelected(p0: AdapterView<*>?) {}
         }
 
         styleSpinner = Spinner(this).apply {
@@ -180,9 +233,12 @@ class MainActivity : ComponentActivity() {
         }
         
         settingsCard.addView(apiKeyInput)
+        settingsCard.addView(modeSpinner)
+        settingsCard.addView(langSpinner) // Adds right below mode
         settingsCard.addView(styleSpinner)
         settingsCard.addView(platformSpinner)
 
+        // Video Card
         val videoCard = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             background = createGradientDrawable("#1E293B", "#1E293B", 30f, 0, "")
@@ -289,6 +345,8 @@ class MainActivity : ComponentActivity() {
             }
             setSpinnerAdapter(styleSpinner, arrayLabels["styles"]!![isMyanmar]!!)
             setSpinnerAdapter(platformSpinner, arrayLabels["platforms"]!![isMyanmar]!!)
+            setSpinnerAdapter(modeSpinner, arrayLabels["modes"]!![isMyanmar]!!)
+            setSpinnerAdapter(langSpinner, arrayLabels["sec_langs"]!![isMyanmar]!!)
         }
 
         btnGenerate.setOnClickListener {
@@ -307,7 +365,6 @@ class MainActivity : ComponentActivity() {
                 try {
                     val audioFile = File(cacheDir, "extracted_audio.m4a")
                     
-                    // Add explicit type Int to progress lambda to fix inference error
                     val extractSuccess = extractAudioFromVideo(selectedVideoUri!!, audioFile.absolutePath) { progress: Int ->
                         withContext(Dispatchers.Main) { 
                             statusText.text = if (isMyanmar) "⏳ အသံထုတ်ယူနေသည်... ($progress%)" else "⏳ Extracting Audio... ($progress%)"
@@ -336,9 +393,24 @@ class MainActivity : ComponentActivity() {
                         
                     val jsonMediaType = "application/json; charset=utf-8".toMediaTypeOrNull()
                     
+                    // --- Dynamic SRT Task (Normal vs Dual Mode) ---
+                    val srtTaskInstruction = if (selectedMode == "Dual") {
+                        """
+                        Task 1: Generate a perfectly timed SRT file from the audio. 
+                        For EVERY subtitle block, provide exactly TWO lines of text: 
+                        The first line MUST be in $selectedSecLang language, and the second line MUST be the direct translation in Myanmar (Burmese) language using a $selectedStyle tone. 
+                        Separate them with a single line break.
+                        """.trimIndent()
+                    } else {
+                        """
+                        Task 1: Generate a perfectly timed SRT file from the audio. Translate directly to Myanmar (Burmese) language using a $selectedStyle tone.
+                        """.trimIndent()
+                    }
+                    
                     val aiPrompt = """
                         You are a professional subtitler and social media SEO expert.
-                        Task 1: Generate a perfectly timed SRT file from the audio. Translate directly to Myanmar (Burmese) language using a $selectedStyle tone.
+                        $srtTaskInstruction
+                        
                         Task 2: Generate highly engaging SEO metadata specifically optimized for $selectedPlatform in Myanmar (Burmese) language based on the video context.
                         
                         You MUST return your EXACT response in the following format with delimiters:
@@ -435,8 +507,6 @@ class MainActivity : ComponentActivity() {
         scrollView.addView(mainLayout)
         setContentView(scrollView)
     }
-
-    // HELPER FUNCTIONS (These must be inside the class)
     
     private fun createGradientDrawable(startColor: String, endColor: String, radius: Float, strokeWidth: Int, strokeColor: String): GradientDrawable {
         val drawable = GradientDrawable(GradientDrawable.Orientation.TL_BR, intArrayOf(Color.parseColor(startColor), Color.parseColor(endColor)))
