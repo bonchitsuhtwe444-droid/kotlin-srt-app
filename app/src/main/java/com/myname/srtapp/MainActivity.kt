@@ -217,11 +217,20 @@ class MainActivity : ComponentActivity() {
                         
                     val jsonMediaType = "application/json; charset=utf-8".toMediaTypeOrNull()
                     
+                    // --- မြန်မာဘာသာသို့ အတင်းအကျပ်ပြောင်းခိုင်းသော Prompt အသစ် (Strict Translation Prompt) ---
+                    val aiPrompt = """
+                        You are an expert translator and subtitler. 
+                        Listen to the audio (which may be in Chinese, English, or any other language) and generate a perfectly timed SRT file. 
+                        You MUST translate the meaning directly into Myanmar (Burmese) language using a $selectedStyle tone. 
+                        The final subtitle text MUST be written entirely in Myanmar script. DO NOT output in the original spoken language. 
+                        Return ONLY the raw SRT text format without any markdown or extra words.
+                    """.trimIndent()
+
                     val geminiJson = JSONObject().apply {
                         put("contents", org.json.JSONArray().apply {
                             put(JSONObject().apply {
                                 put("parts", org.json.JSONArray().apply {
-                                    put(JSONObject().apply { put("text", "You are an expert subtitler. Listen and generate a perfectly timed SRT file. Translate directly into Myanmar (Burmese) language using a $selectedStyle tone. Return ONLY raw SRT text format.") })
+                                    put(JSONObject().apply { put("text", aiPrompt) })
                                     put(JSONObject().apply { put("inline_data", JSONObject().apply { put("mime_type", "audio/mp4"); put("data", base64Audio) }) })
                                 })
                             })
@@ -245,7 +254,6 @@ class MainActivity : ComponentActivity() {
 
                             withContext(Dispatchers.Main) {
                                 if (isSaved) {
-                                    // ဤနေရာတွင် User တောင်းဆိုထားသည့်အတိုင်း စာသားကို အတိအကျပြောင်းလဲပေးထားပါသည်
                                     statusText.text = if (isMyanmar) "✅ ပြီးစီးပါပြီ! Downloads/AutoSRT သို့သိမ်းပြီးပါပြီ။" else "✅ Success! Saved to Downloads/AutoSRT."
                                     statusText.setTextColor(Color.parseColor("#4ADE80"))
                                 } else {
@@ -275,7 +283,6 @@ class MainActivity : ComponentActivity() {
         mainLayout.addView(apiKeyInput)
         mainLayout.addView(styleSpinner)
         
-        // Add empty space to push buttons to center/bottom area
         val spacer = View(this).apply { layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f) }
         mainLayout.addView(spacer)
         
