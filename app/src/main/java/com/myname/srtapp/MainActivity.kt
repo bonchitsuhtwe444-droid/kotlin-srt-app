@@ -1,3 +1,6 @@
+Metadata တွေကို ဖိုင်အဖြစ် (Text File) မထုတ်တော့ဘဲ၊ App ထဲမှာတင် ချက်ချင်း Copy ကူးလို့ရမယ့် Text Box နဲ့ ပြောင်းပေးလိုက်ပါပြီ။ ဒါ့အပြင် YouTube, TikTok နဲ့ Facebook စတဲ့ Platform ရွေးချယ်နိုင်တဲ့ စနစ် (Spinner) ကိုပါ ထပ်ထည့်ပေးထားလို့ AI က သင်ရွေးချယ်တဲ့ Platform ရဲ့ သဘာဝနဲ့ ကိုက်ညီမယ့် ခေါင်းစဉ်၊ Description နဲ့ Hashtag တွေကို အတိအကျ ရေးပေးသွားမှာပါ။
+စာတွေအများကြီး ထွက်လာတဲ့အခါ အပေါ်အောက် ဆွဲကြည့်လို့ရအောင် (Scroll) လည်း တစ်ခါတည်း ထည့်သွင်းပေးထားပါတယ်။
+အောက်ပါ MainActivity.kt အပြည့်အစုံ ကို အရင်တိုင်း အစအဆုံး အစားထိုးလိုက်ပါ-
 package com.myname.srtapp
 
 import android.annotation.SuppressLint
@@ -36,37 +39,54 @@ class MainActivity : ComponentActivity() {
 
     private lateinit var statusText: TextView
     private var selectedVideoUri: Uri? = null
-    private var generatedSrtContent: String = ""
     private var selectedStyle = "Standard"
+    private var selectedPlatform = "YouTube" // Platform အသစ်အတွက်
 
     private lateinit var titleText: TextView
+    private lateinit var subTitleText: TextView
     private lateinit var apiKeyInput: EditText
     private lateinit var btnPickVideo: Button
     private lateinit var btnGenerate: Button
     private lateinit var styleSpinner: Spinner
+    private lateinit var platformSpinner: Spinner
+    private lateinit var videoStatusText: TextView
+    
+    // Metadata ရလဒ်ပြသမည့် နေရာများ
+    private lateinit var metadataCard: LinearLayout
+    private lateinit var metadataTitle: TextView
+    private lateinit var metadataInput: EditText
 
     private var isMyanmar = true 
 
     private val textLabels: Map<String, Map<Boolean, String>> = mapOf(
-        "title" to mapOf(true to "AUTO SRT GEN", false to "AUTO SRT GEN"),
-        "api_hint" to mapOf(true to "Gemini API Key ထည့်ပါ", false to "Enter Gemini API Key"),
-        "pick_vid" to mapOf(true to "📁 ဗီဒီယို ရွေးပါ", false to "📁 Select Video"),
-        "gen_srt" to mapOf(true to "🚀 SRT ဖိုင်ထုတ်မည်", false to "🚀 Generate SRT"),
-        "ready" to mapOf(true to "အသင့်ဖြစ်ပါပြီ...", false to "Ready to start...")
+        "title" to mapOf(true to "CREATOR STUDIO", false to "CREATOR STUDIO"),
+        "subtitle" to mapOf(true to "AI SRT & Metadata Generator", false to "AI SRT & Metadata Generator"),
+        "api_hint" to mapOf(true to "🔑 Gemini API Key ထည့်ပါ", false to "🔑 Enter Gemini API Key"),
+        "pick_vid" to mapOf(true to "📁 ဗီဒီယို ဖိုင်ရွေးချယ်ပါ", false to "📁 Select Video File"),
+        "vid_ready" to mapOf(true to "✅ ဗီဒီယို အသင့်ဖြစ်ပါပြီ", false to "✅ Video Ready"),
+        "vid_none" to mapOf(true to "ဗီဒီယို မရွေးရသေးပါ", false to "No video selected"),
+        "gen_btn" to mapOf(true to "🚀 ဂျင်နရိတ် လုပ်မည်", false to "🚀 Generate Now"),
+        "ready" to mapOf(true to "အသင့်ဖြစ်ပါပြီ... စတင်ရန် ခလုတ်နှိပ်ပါ။", false to "Ready... Press generate to start."),
+        "meta_title" to mapOf(true to "📝 ဆိုရှယ်မီဒီယာ စာသားများ (Copy ယူနိုင်ပါသည်)", false to "📝 Social Media Metadata (Ready to copy)")
     )
 
     private val arrayLabels: Map<String, Map<Boolean, Array<String>>> = mapOf(
         "styles" to mapOf(
-            true to arrayOf("ပုံမှန် (Standard)", "အလွတ်သဘော (Informal)", "အက်ရှင် (Action)", "ဟာသ (Comedy)"),
-            false to arrayOf("Standard", "Informal", "Action", "Comedy")
+            true to arrayOf("🎬 ပုံမှန် (Standard)", "💬 အလွတ်သဘော (Informal)", "🔥 အက်ရှင် (Action)", "😂 ဟာသ (Comedy)"),
+            false to arrayOf("🎬 Standard", "💬 Informal", "🔥 Action", "😂 Comedy")
+        ),
+        "platforms" to mapOf(
+            true to arrayOf("▶️ YouTube အတွက်", "🎵 TikTok အတွက်", "📘 Facebook အတွက်"),
+            false to arrayOf("▶️ For YouTube", "🎵 For TikTok", "📘 For Facebook")
         )
     )
 
     private val pickVideoLauncher = registerForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
         if (uri != null) {
             selectedVideoUri = uri
-            statusText.text = if (isMyanmar) "✅ ဗီဒီယိုဖိုင် ရွေးချယ်ပြီးပါပြီ။" else "✅ Video selected."
-            statusText.setTextColor(Color.parseColor("#4ADE80"))
+            videoStatusText.text = textLabels["vid_ready"]!![isMyanmar]
+            videoStatusText.setTextColor(Color.parseColor("#4ADE80")) 
+            btnPickVideo.background = createGradientDrawable("#1E293B", "#334155", 25f, 3, "#4ADE80")
         }
     }
 
@@ -74,58 +94,75 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        // UI ကို အပေါ်အောက် ဆွဲနိုင်ရန် ScrollView ထည့်သွင်းခြင်း
+        val scrollView = ScrollView(this).apply {
+            layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
+            isFillViewport = true
+            setBackgroundColor(Color.parseColor("#0F172A")) 
+        }
+
         val mainLayout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setBackgroundColor(Color.parseColor("#0B101E")) 
-            layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
-            setPadding(40, 60, 40, 60)
+            layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+            setPadding(50, 70, 50, 70)
         }
 
-        // Language Toggle
-        val langToggleRow = LinearLayout(this).apply {
+        val topBar = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.END
-            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { bottomMargin = 20 }
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { bottomMargin = 40 }
         }
+        
         val btnLang = Button(this).apply {
-            text = "🌐 English"
+            text = "🌐 ENG"
             isAllCaps = false; setTextColor(Color.WHITE); textSize = 12f
-            background = GradientDrawable().apply { setColor(Color.parseColor("#334155")); cornerRadius = 15f }
-            setPadding(20, 10, 20, 10)
+            background = createGradientDrawable("#1E293B", "#1E293B", 20f, 2, "#475569")
+            setPadding(30, 10, 30, 10)
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, 100)
         }
-        langToggleRow.addView(btnLang)
+        topBar.addView(btnLang)
 
-        // Title
         titleText = TextView(this).apply {
             text = textLabels["title"]!![isMyanmar]
             textSize = 28f
             setTypeface(null, Typeface.BOLD)
-            setTextColor(Color.parseColor("#00C6FF"))
-            gravity = Gravity.CENTER
-            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { bottomMargin = 40 }
+            setTextColor(Color.WHITE)
+            gravity = Gravity.CENTER_HORIZONTAL
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
+        }
+        
+        subTitleText = TextView(this).apply {
+            text = textLabels["subtitle"]!![isMyanmar]
+            textSize = 14f
+            setTextColor(Color.parseColor("#38BDF8")) 
+            gravity = Gravity.CENTER_HORIZONTAL
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { bottomMargin = 60 }
         }
 
-        // API Key Input
+        // Settings Card
+        val settingsCard = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            background = createGradientDrawable("#1E293B", "#1E293B", 30f, 0, "")
+            setPadding(40, 50, 40, 50)
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { bottomMargin = 40 }
+            elevation = 10f
+        }
+
         apiKeyInput = EditText(this).apply {
             hint = textLabels["api_hint"]!![isMyanmar]
-            setHintTextColor(Color.parseColor("#475569"))
+            setHintTextColor(Color.parseColor("#64748B"))
             setTextColor(Color.WHITE)
             textSize = 14f
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
-            background = GradientDrawable().apply {
-                setColor(Color.parseColor("#151C2C"))
-                cornerRadius = 20f
-                setStroke(2, Color.parseColor("#2A344A"))
-            }
-            setPadding(40, 35, 40, 35)
+            background = createGradientDrawable("#0F172A", "#0F172A", 20f, 2, "#334155")
+            setPadding(40, 40, 40, 40)
             layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { bottomMargin = 30 }
         }
 
-        // Style Spinner
         styleSpinner = Spinner(this).apply {
-            background = GradientDrawable().apply { setColor(Color.parseColor("#151C2C")); cornerRadius = 20f; setStroke(2, Color.parseColor("#2A344A")) }
-            setPopupBackgroundDrawable(ColorDrawable(Color.parseColor("#151C2C")))
-            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { bottomMargin = 40 }
+            background = createGradientDrawable("#0F172A", "#0F172A", 20f, 2, "#334155")
+            setPopupBackgroundDrawable(ColorDrawable(Color.parseColor("#1E293B")))
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { bottomMargin = 30 }
         }
         setSpinnerAdapter(styleSpinner, arrayLabels["styles"]!![isMyanmar]!!)
         styleSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
@@ -135,56 +172,146 @@ class MainActivity : ComponentActivity() {
             override fun onNothingSelected(p0: AdapterView<*>?) {}
         }
 
-        // Buttons
+        platformSpinner = Spinner(this).apply {
+            background = createGradientDrawable("#0F172A", "#0F172A", 20f, 2, "#334155")
+            setPopupBackgroundDrawable(ColorDrawable(Color.parseColor("#1E293B")))
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
+        }
+        setSpinnerAdapter(platformSpinner, arrayLabels["platforms"]!![isMyanmar]!!)
+        platformSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(p0: AdapterView<*>?, p1: View?, pos: Int, p3: Long) {
+                selectedPlatform = when(pos) { 1 -> "TikTok"; 2 -> "Facebook"; else -> "YouTube" }
+            }
+            override fun onNothingSelected(p0: AdapterView<*>?) {}
+        }
+        
+        settingsCard.addView(apiKeyInput)
+        settingsCard.addView(styleSpinner)
+        settingsCard.addView(platformSpinner)
+
+        // Video Card
+        val videoCard = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            background = createGradientDrawable("#1E293B", "#1E293B", 30f, 0, "")
+            setPadding(40, 50, 40, 50)
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { bottomMargin = 60 }
+            elevation = 10f
+        }
+
         btnPickVideo = Button(this).apply {
             text = textLabels["pick_vid"]!![isMyanmar]
-            isAllCaps = false; setTextColor(Color.WHITE); textSize = 16f
-            background = GradientDrawable().apply { setColor(Color.parseColor("#2563EB")); cornerRadius = 20f }
+            isAllCaps = false; setTextColor(Color.WHITE); textSize = 15f
+            background = createGradientDrawable("#334155", "#475569", 25f, 0, "")
             layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { bottomMargin = 20 }
-            setPadding(0, 30, 0, 30)
+            setPadding(0, 40, 0, 40)
             setOnClickListener { pickVideoLauncher.launch("video/*") }
         }
 
-        btnGenerate = Button(this).apply {
-            text = textLabels["gen_srt"]!![isMyanmar]
-            isAllCaps = false; setTextColor(Color.WHITE); textSize = 16f; setTypeface(null, Typeface.BOLD)
-            background = GradientDrawable(GradientDrawable.Orientation.TL_BR, intArrayOf(Color.parseColor("#00C6FF"), Color.parseColor("#0072FF"))).apply { cornerRadius = 20f }
-            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { bottomMargin = 40 }
-            setPadding(0, 35, 0, 35)
+        videoStatusText = TextView(this).apply {
+            text = textLabels["vid_none"]!![isMyanmar]
+            setTextColor(Color.parseColor("#94A3B8"))
+            gravity = Gravity.CENTER_HORIZONTAL
+            textSize = 12f
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
         }
 
-        // Status Text
+        videoCard.addView(btnPickVideo)
+        videoCard.addView(videoStatusText)
+
+        // Generate Button
+        btnGenerate = Button(this).apply {
+            text = textLabels["gen_btn"]!![isMyanmar]
+            isAllCaps = false; setTextColor(Color.WHITE); textSize = 16f; setTypeface(null, Typeface.BOLD)
+            background = createGradientDrawable("#3B82F6", "#2563EB", 30f, 0, "")
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { bottomMargin = 40 }
+            setPadding(0, 45, 0, 45)
+            elevation = 15f
+        }
+
+        // Status
+        val statusCard = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            background = createGradientDrawable("#0F172A", "#0F172A", 20f, 2, "#1E293B")
+            setPadding(30, 40, 30, 40)
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { bottomMargin = 40 }
+        }
+        
         statusText = TextView(this).apply {
             text = textLabels["ready"]!![isMyanmar]
             setTextColor(Color.parseColor("#94A3B8"))
             gravity = Gravity.CENTER
+            textSize = 13f
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
+        }
+        statusCard.addView(statusText)
+
+        // Metadata Textbox Card (ကနဦးတွင် ပိတ်ထားမည်)
+        metadataCard = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            background = createGradientDrawable("#1E293B", "#1E293B", 30f, 0, "")
+            setPadding(40, 50, 40, 50)
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { bottomMargin = 40 }
+            elevation = 10f
+            visibility = View.GONE
+        }
+
+        metadataTitle = TextView(this).apply {
+            text = textLabels["meta_title"]!![isMyanmar]
+            setTextColor(Color.parseColor("#38BDF8"))
+            textSize = 15f
+            setTypeface(null, Typeface.BOLD)
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { bottomMargin = 20 }
+        }
+
+        metadataInput = EditText(this).apply {
+            setTextColor(Color.WHITE)
             textSize = 14f
+            background = createGradientDrawable("#0F172A", "#0F172A", 20f, 2, "#334155")
+            setPadding(40, 40, 40, 40)
+            minLines = 8
+            gravity = Gravity.TOP or Gravity.START
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE
+            isSingleLine = false
             layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
         }
 
+        metadataCard.addView(metadataTitle)
+        metadataCard.addView(metadataInput)
+
         btnLang.setOnClickListener {
             isMyanmar = !isMyanmar
-            btnLang.text = if (isMyanmar) "🌐 English" else "🌐 မြန်မာ"
+            btnLang.text = if (isMyanmar) "🌐 ENG" else "🌐 မြန်မာ"
             titleText.text = textLabels["title"]!![isMyanmar]
+            subTitleText.text = textLabels["subtitle"]!![isMyanmar]
             apiKeyInput.hint = textLabels["api_hint"]!![isMyanmar]
             btnPickVideo.text = textLabels["pick_vid"]!![isMyanmar]
-            btnGenerate.text = textLabels["gen_srt"]!![isMyanmar]
+            btnGenerate.text = textLabels["gen_btn"]!![isMyanmar]
+            metadataTitle.text = textLabels["meta_title"]!![isMyanmar]
             
+            if (selectedVideoUri == null) {
+                videoStatusText.text = textLabels["vid_none"]!![isMyanmar]
+            } else {
+                videoStatusText.text = textLabels["vid_ready"]!![isMyanmar]
+            }
+
             if (statusText.text.toString().contains("Ready") || statusText.text.toString().contains("အသင့်")) {
                 statusText.text = textLabels["ready"]!![isMyanmar]
             }
             setSpinnerAdapter(styleSpinner, arrayLabels["styles"]!![isMyanmar]!!)
+            setSpinnerAdapter(platformSpinner, arrayLabels["platforms"]!![isMyanmar]!!)
         }
 
         btnGenerate.setOnClickListener {
             val apiKey = apiKeyInput.text.toString().trim()
             if (apiKey.isEmpty() || selectedVideoUri == null) {
-                statusText.text = if (isMyanmar) "⚠️ Gemini API Key နှင့် Video ထည့်ပေးပါ!" else "⚠️ Enter Gemini API Key & Video!"
-                statusText.setTextColor(Color.parseColor("#EF4444"))
+                statusText.text = if (isMyanmar) "⚠️ API Key နှင့် Video ဖိုင်ကို ထည့်သွင်းပေးပါ။" else "⚠️ Please provide API Key and Video file."
+                statusText.setTextColor(Color.parseColor("#F87171")) 
                 return@setOnClickListener
             }
 
             btnGenerate.isEnabled = false; btnGenerate.alpha = 0.5f
+            metadataCard.visibility = View.GONE
+            metadataInput.setText("")
 
             CoroutineScope(Dispatchers.IO).launch {
                 try {
@@ -198,13 +325,13 @@ class MainActivity : ComponentActivity() {
 
                     if (!extractSuccess || !audioFile.exists()) {
                         withContext(Dispatchers.Main) { 
-                            statusText.text = if (isMyanmar) "❌ အသံထုတ်မရပါ" else "❌ Audio extraction failed"
+                            statusText.text = if (isMyanmar) "❌ အသံထုတ်ယူမှု ကျရှုံးပါသည်" else "❌ Audio extraction failed"
                             btnGenerate.isEnabled = true; btnGenerate.alpha = 1.0f 
                         }
                         return@launch
                     }
 
-                    withContext(Dispatchers.Main) { statusText.text = if (isMyanmar) "🌐 AI ဘာသာပြန်နေသည်... ခဏစောင့်ပါ" else "🌐 AI Translating... Please wait." }
+                    withContext(Dispatchers.Main) { statusText.text = if (isMyanmar) "🌐 AI ဘာသာပြန်နေသည်... ခဏစောင့်ပါ" else "🌐 AI is processing... Please wait." }
 
                     val bytes = audioFile.readBytes()
                     val base64Audio = Base64.encodeToString(bytes, Base64.NO_WRAP)
@@ -217,13 +344,25 @@ class MainActivity : ComponentActivity() {
                         
                     val jsonMediaType = "application/json; charset=utf-8".toMediaTypeOrNull()
                     
-                    // --- မြန်မာဘာသာသို့ အတင်းအကျပ်ပြောင်းခိုင်းသော Prompt အသစ် (Strict Translation Prompt) ---
+                    // --- Platform ကိုပါ သေချာတိကျစွာ ခွဲခြားထုတ်ပေးမည့် Prompt ---
                     val aiPrompt = """
-                        You are an expert translator and subtitler. 
-                        Listen to the audio (which may be in Chinese, English, or any other language) and generate a perfectly timed SRT file. 
-                        You MUST translate the meaning directly into Myanmar (Burmese) language using a $selectedStyle tone. 
-                        The final subtitle text MUST be written entirely in Myanmar script. DO NOT output in the original spoken language. 
-                        Return ONLY the raw SRT text format without any markdown or extra words.
+                        You are a professional subtitler and social media SEO expert.
+                        Task 1: Generate a perfectly timed SRT file from the audio. Translate directly to Myanmar (Burmese) language using a $selectedStyle tone.
+                        Task 2: Generate highly engaging SEO metadata specifically optimized for $selectedPlatform in Myanmar (Burmese) language based on the video context.
+                        
+                        You MUST return your EXACT response in the following format with delimiters:
+                        
+                        ===SRT===
+                        [Insert raw SRT text here]
+                        ===METADATA===
+                        📌 $selectedPlatform Title:
+                        [Write 2-3 engaging titles for $selectedPlatform]
+                        
+                        📝 Description / Caption:
+                        [Write a suitable description/caption for $selectedPlatform]
+                        
+                        🏷️ Hashtags:
+                        [Write 5-10 trending hashtags suitable for $selectedPlatform]
                     """.trimIndent()
 
                     val geminiJson = JSONObject().apply {
@@ -246,74 +385,98 @@ class MainActivity : ComponentActivity() {
 
                     if (response.isSuccessful && responseStr != null) {
                         try {
-                            var extractedText = JSONObject(responseStr).getJSONArray("candidates").getJSONObject(0).getJSONObject("content").getJSONArray("parts").getJSONObject(0).getString("text")
-                            extractedText = extractedText.replace("```srt", "").replace("```", "").trim()
-                            generatedSrtContent = extractedText
+                            val extractedText = JSONObject(responseStr).getJSONArray("candidates").getJSONObject(0).getJSONObject("content").getJSONArray("parts").getJSONObject(0).getString("text")
+                            
+                            var srtContent = ""
+                            var metaContent = ""
 
-                            val isSaved = autoSaveTextFile("AutoSRT_${System.currentTimeMillis()}.srt", generatedSrtContent)
+                            if (extractedText.contains("===METADATA===")) {
+                                val parts = extractedText.split("===METADATA===")
+                                srtContent = parts[0].replace("===SRT===", "").replace("```srt", "").replace("```", "").trim()
+                                metaContent = parts.getOrNull(1)?.replace("```txt", "")?.replace("```", "")?.trim() ?: ""
+                            } else {
+                                srtContent = extractedText.replace("```srt", "").replace("```", "").trim()
+                            }
+
+                            val timestamp = System.currentTimeMillis()
+                            val srtSaved = autoSaveFile("AutoSRT_$timestamp.srt", "application/x-subrip", srtContent)
 
                             withContext(Dispatchers.Main) {
-                                if (isSaved) {
-                                    statusText.text = if (isMyanmar) "✅ ပြီးစီးပါပြီ! Downloads/AutoSRT သို့သိမ်းပြီးပါပြီ။" else "✅ Success! Saved to Downloads/AutoSRT."
+                                if (srtSaved) {
+                                    statusText.text = if (isMyanmar) "🎉 အောင်မြင်ပါသည်!\nSRT အား Downloads/AutoSRT တွင် သိမ်းဆည်းပြီးပါပြီ။" else "🎉 Success!\nSaved SRT to Downloads/AutoSRT."
                                     statusText.setTextColor(Color.parseColor("#4ADE80"))
+                                    
+                                    // Text Box အတွင်းသို့ Metadata များကို တိုက်ရိုက်ထည့်သွင်းပြသခြင်း
+                                    if (metaContent.isNotEmpty()) {
+                                        metadataCard.visibility = View.VISIBLE
+                                        metadataInput.setText(metaContent)
+                                        // အောက်ဆုံးသို့ Scroll အလိုလို ဆွဲချပေးခြင်း
+                                        scrollView.post { scrollView.fullScroll(View.FOCUS_DOWN) }
+                                    }
                                 } else {
                                     statusText.text = if (isMyanmar) "⚠️ ဖုန်းထဲသိမ်း၍မရပါ။ Storage Permission လိုအပ်ပါသည်။" else "⚠️ Save Failed. Storage Permission required."
                                     statusText.setTextColor(Color.parseColor("#F59E0B"))
                                 }
                             }
                         } catch (e: Exception) {
-                            withContext(Dispatchers.Main) { statusText.text = "❌ Gemini Parsing Error"; statusText.setTextColor(Color.parseColor("#EF4444")) }
+                            withContext(Dispatchers.Main) { statusText.text = "❌ Gemini Parsing Error"; statusText.setTextColor(Color.parseColor("#F87171")) }
                         }
                     } else {
                         val errMsg = try { JSONObject(responseStr ?: "").getJSONObject("error").getString("message") } catch(e:Exception){ "HTTP ${response.code}" }
-                        withContext(Dispatchers.Main) { statusText.text = "❌ API Error: $errMsg"; statusText.setTextColor(Color.parseColor("#EF4444")) }
+                        withContext(Dispatchers.Main) { statusText.text = "❌ API Error: $errMsg"; statusText.setTextColor(Color.parseColor("#F87171")) }
                     }
                     audioFile.delete()
                 } catch (e: Exception) {
-                    withContext(Dispatchers.Main) { statusText.text = "❌ Error: ${e.message}" }
+                    withContext(Dispatchers.Main) { statusText.text = "❌ Error: ${e.message}"; statusText.setTextColor(Color.parseColor("#F87171")) }
                 } finally {
                     withContext(Dispatchers.Main) { btnGenerate.isEnabled = true; btnGenerate.alpha = 1.0f }
                 }
             }
         }
 
-        // Add views to layout
-        mainLayout.addView(langToggleRow)
+        mainLayout.addView(topBar)
         mainLayout.addView(titleText)
-        mainLayout.addView(apiKeyInput)
-        mainLayout.addView(styleSpinner)
-        
-        val spacer = View(this).apply { layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f) }
-        mainLayout.addView(spacer)
-        
-        mainLayout.addView(btnPickVideo)
+        mainLayout.addView(subTitleText)
+        mainLayout.addView(settingsCard)
+        mainLayout.addView(videoCard)
         mainLayout.addView(btnGenerate)
-        mainLayout.addView(statusText)
+        mainLayout.addView(statusCard)
+        mainLayout.addView(metadataCard) // Metadata TextBox Card
 
-        setContentView(mainLayout)
+        scrollView.addView(mainLayout)
+        setContentView(scrollView)
+    }
+
+    private fun createGradientDrawable(startColor: String, endColor: String, radius: Float, strokeWidth: Int, strokeColor: String): GradientDrawable {
+        val drawable = GradientDrawable(GradientDrawable.Orientation.TL_BR, intArrayOf(Color.parseColor(startColor), Color.parseColor(endColor)))
+        drawable.cornerRadius = radius
+        if (strokeWidth > 0 && strokeColor.isNotEmpty()) {
+            drawable.setStroke(strokeWidth, Color.parseColor(strokeColor))
+        }
+        return drawable
     }
 
     private fun setSpinnerAdapter(spinner: Spinner, items: Array<String>) {
         val adapter = object : ArrayAdapter<String>(this@MainActivity, android.R.layout.simple_spinner_dropdown_item, items) {
             override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
                 val view = super.getView(position, convertView, parent) as TextView
-                view.setTextColor(Color.WHITE); view.textSize = 14f; view.setPadding(30, 30, 30, 30); view.gravity = Gravity.CENTER
+                view.setTextColor(Color.WHITE); view.textSize = 14f; view.setPadding(20, 30, 20, 30)
                 return view
             }
             override fun getDropDownView(position: Int, convertView: View?, parent: ViewGroup): View {
                 val view = super.getDropDownView(position, convertView, parent) as TextView
-                view.setTextColor(Color.parseColor("#E2E8F0")); view.setBackgroundColor(Color.parseColor("#151C2C")); view.setPadding(40, 40, 40, 40)
+                view.setTextColor(Color.parseColor("#E2E8F0")); view.setBackgroundColor(Color.parseColor("#1E293B")); view.setPadding(40, 40, 40, 40)
                 return view
             }
         }
         spinner.adapter = adapter
     }
 
-    private fun autoSaveTextFile(fileName: String, content: String): Boolean {
+    private fun autoSaveFile(fileName: String, mimeType: String, content: String): Boolean {
         return try {
             val values = ContentValues().apply {
                 put(MediaStore.MediaColumns.DISPLAY_NAME, fileName)
-                put(MediaStore.MediaColumns.MIME_TYPE, "application/x-subrip")
+                put(MediaStore.MediaColumns.MIME_TYPE, mimeType)
                 put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS + "/AutoSRT")
             }
             val uri = contentResolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
@@ -369,3 +532,4 @@ class MainActivity : ComponentActivity() {
         } catch (e: Exception) { e.printStackTrace(); return false }
     }
 }
+
