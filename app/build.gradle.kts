@@ -16,7 +16,7 @@ android {
     }
 
     buildTypes {
-        getByName("release") {
+        release {
             isMinifyEnabled = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
@@ -34,15 +34,13 @@ dependencies {
     implementation("androidx.core:core-ktx:1.12.0")
     implementation("androidx.appcompat:appcompat:1.6.1")
     implementation("com.google.android.material:material:1.11.0")
-    
-    // Coroutines
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
+    implementation("androidx.activity:activity-ktx:1.8.2")
+
+    // Background လုပ်ငန်းစဉ်များအတွက် (Coroutines)
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
-    
-    // OkHttp (Gemini API အတွက်)
+
+    // Gemini API ချိတ်ဆက်ရန်အတွက် (OkHttp)
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     
-    // FFmpegKit (Video Export ထုတ်ရန်အတွက်)
-    implementation("dev.ffmpegkit-maintained:ffmpeg-kit-full:8.1.7")
-
+    // ❌ FFmpegKit ကို လုံးဝ ဖယ်ရှားလိုက်ပါပြီ
 }
