@@ -5,6 +5,7 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.ContentValues
 import android.content.Context
+import android.content.Intent
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.ColorDrawable
@@ -132,8 +133,23 @@ class MainActivity : ComponentActivity() {
         // --- Top Bar (Weight: 1) ---
         val topBar = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL or Gravity.END
+            gravity = Gravity.CENTER_VERTICAL
             layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f)
+        }
+
+        // ☕ Developer Tip Button (Facebook Link)
+        val btnTip = Button(this).apply {
+            text = "☕ မုန့်ဖိုးပေးမည်"
+            isAllCaps = false
+            setTextColor(Color.parseColor("#FCD34D")) // Gold/Amber text
+            textSize = 12f
+            background = createGradientDrawable("#1E293B", "#1E293B", 20f, 1, "#F59E0B") // Gold Border
+            layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.MATCH_PARENT).apply { topMargin=10; bottomMargin=10 }
+            setPadding(30, 10, 30, 10)
+            setOnClickListener {
+                val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://www.facebook.com/profile.php?id=61593224578740"))
+                startActivity(intent)
+            }
         }
 
         val topSpacer = View(this).apply { layoutParams = LinearLayout.LayoutParams(0, 1, 1f) }
@@ -143,7 +159,7 @@ class MainActivity : ComponentActivity() {
             setTextColor(Color.WHITE)
             textSize = 16f
             background = createGradientDrawable("#1E293B", "#1E293B", 20f, 1, "#475569")
-            layoutParams = LinearLayout.LayoutParams(120, LinearLayout.LayoutParams.MATCH_PARENT).apply { marginEnd = 20; topMargin=10; bottomMargin=10}
+            layoutParams = LinearLayout.LayoutParams(120, LinearLayout.LayoutParams.MATCH_PARENT).apply { marginEnd = 15; topMargin=10; bottomMargin=10}
             setOnClickListener { showSettingsDialog() }
         }
 
@@ -151,9 +167,10 @@ class MainActivity : ComponentActivity() {
             text = "ENG"
             isAllCaps = false; setTextColor(Color.WHITE); textSize = 12f
             background = createGradientDrawable("#1E293B", "#1E293B", 20f, 1, "#475569")
-            layoutParams = LinearLayout.LayoutParams(150, LinearLayout.LayoutParams.MATCH_PARENT).apply{ topMargin=10; bottomMargin=10}
+            layoutParams = LinearLayout.LayoutParams(130, LinearLayout.LayoutParams.MATCH_PARENT).apply{ topMargin=10; bottomMargin=10}
         }
 
+        topBar.addView(btnTip)
         topBar.addView(topSpacer)
         topBar.addView(btnSettings)
         topBar.addView(btnLang)
@@ -593,14 +610,20 @@ class MainActivity : ComponentActivity() {
                         """.trimIndent()
                     }
 
+                    // --- Content Moderation Rules Added ---
                     val aiPrompt = """
                         STRICT INSTRUCTIONS: You are a professional subtitler. You MUST completely ignore the original language text and ONLY output the requested translations.
+                        
+                        CRITICAL CONTENT MODERATION (YELLOW DOLLAR PROTECTION):
+                        - You MUST aggressively sanitize all Burmese translations and metadata.
+                        - Replace violent, adult, or sensitive words (e.g., သတ်တယ်, သွေးထွက်တယ်, မုဒိမ်းကျင့်တယ်, သေတယ်) with monetization-friendly, safe alternatives (e.g., ရှင်းလင်းတယ်, ထိခိုက်သွားတယ်, အနိုင်ကျင့်ခံရတယ်, ဆုံးပါးသွားတယ်).
+                        - Ensure 100% compliance with YouTube/TikTok advertiser-friendly guidelines.
                         
                         Task 1: Generate a perfectly timed SRT file from the audio.
                         $srtTaskInstruction
                         
                         Task 2: Generate highly engaging SEO metadata specifically optimized for $selectedPlatform.
-                        CRITICAL: The Titles, Description, and Hashtags MUST be written ENTIRELY in Myanmar (Burmese) language.
+                        CRITICAL: The Titles, Description, and Hashtags MUST be written ENTIRELY in Myanmar (Burmese) language and be completely safe/monetization-friendly.
                         
                         You MUST return your EXACT response in the following format with delimiters:
                         
@@ -805,7 +828,6 @@ class MainActivity : ComponentActivity() {
             override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
                 val view = super.getView(position, convertView, parent) as TextView
                 view.setTextColor(Color.parseColor("#E2E8F0")); view.textSize = 13f; view.setPadding(10, 20, 10, 20)
-                // Center text in spinner
                 view.gravity = Gravity.CENTER
                 return view
             }
