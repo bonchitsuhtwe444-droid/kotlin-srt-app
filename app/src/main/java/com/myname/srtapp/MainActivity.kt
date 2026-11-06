@@ -6,6 +6,7 @@ import android.content.ClipboardManager
 import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
+import android.content.res.ColorStateList
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.ColorDrawable
@@ -51,6 +52,7 @@ class MainActivity : ComponentActivity() {
     private lateinit var rootLayout: FrameLayout
     private lateinit var mainContentLayout: LinearLayout
     private lateinit var resultLayout: LinearLayout
+    private lateinit var splashLayout: RelativeLayout // Loading မျက်နှာပြင်အတွက်
 
     // Main UI Elements
     private lateinit var titleText: TextView
@@ -106,7 +108,7 @@ class MainActivity : ComponentActivity() {
             selectedVideoUri = uri
             videoStatusText.text = textLabels["vid_ready"]!![isMyanmar]
             videoStatusText.setTextColor(Color.parseColor("#4ADE80"))
-            btnPickVideo.background = createGradientDrawable("#1E293B", "#334155", 25f, 2, "#4ADE80") // Green border on ready
+            btnPickVideo.background = createGradientDrawable("#1E293B", "#334155", 25f, 2, "#4ADE80") 
         }
     }
 
@@ -114,10 +116,10 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Root FrameLayout - No ScrollView (Platinum Fixed Layout)
+        // Root FrameLayout
         rootLayout = FrameLayout(this).apply {
             layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
-            setBackgroundColor(Color.parseColor("#090E17")) // Deep Platinum Dark Base
+            setBackgroundColor(Color.parseColor("#090E17")) 
         }
 
         // ==========================================
@@ -130,20 +132,18 @@ class MainActivity : ComponentActivity() {
             weightSum = 10f 
         }
 
-        // --- Top Bar (Weight: 1) ---
         val topBar = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
             layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f)
         }
 
-        // ☕ Developer Tip Button (Facebook Link)
         val btnTip = Button(this).apply {
             text = "☕ မုန့်ဖိုးပေးမည်"
             isAllCaps = false
-            setTextColor(Color.parseColor("#FCD34D")) // Gold/Amber text
+            setTextColor(Color.parseColor("#FCD34D")) 
             textSize = 12f
-            background = createGradientDrawable("#1E293B", "#1E293B", 20f, 1, "#F59E0B") // Gold Border
+            background = createGradientDrawable("#1E293B", "#1E293B", 20f, 1, "#F59E0B") 
             layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.MATCH_PARENT).apply { topMargin=10; bottomMargin=10 }
             setPadding(30, 10, 30, 10)
             setOnClickListener {
@@ -155,7 +155,7 @@ class MainActivity : ComponentActivity() {
         val topSpacer = View(this).apply { layoutParams = LinearLayout.LayoutParams(0, 1, 1f) }
 
         val btnSettings = Button(this).apply {
-            text = "⚙️" // Icon only for cleaner look
+            text = "⚙️" 
             setTextColor(Color.WHITE)
             textSize = 16f
             background = createGradientDrawable("#1E293B", "#1E293B", 20f, 1, "#475569")
@@ -175,7 +175,6 @@ class MainActivity : ComponentActivity() {
         topBar.addView(btnSettings)
         topBar.addView(btnLang)
 
-        // --- Header Section (Weight: 1.5) ---
         val headerLayout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER
@@ -199,7 +198,6 @@ class MainActivity : ComponentActivity() {
         headerLayout.addView(titleText)
         headerLayout.addView(subTitleText)
 
-        // --- Settings Area (Weight: 4.5) ---
         val settingsLayout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 4.5f)
@@ -216,7 +214,6 @@ class MainActivity : ComponentActivity() {
             layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f).apply { bottomMargin = 20 }
         }
 
-        // Row 1: Mode & Language
         val row1 = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f).apply { bottomMargin = 20 }
@@ -256,7 +253,6 @@ class MainActivity : ComponentActivity() {
             override fun onNothingSelected(p0: AdapterView<*>?) {}
         }
 
-        // Row 2: Style & Platform
         val row2 = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f).apply { bottomMargin = 20 }
@@ -292,7 +288,6 @@ class MainActivity : ComponentActivity() {
         row2.addView(styleSpinner)
         row2.addView(platformSpinner)
 
-        // Video Pick Area
         val videoPickContainer = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER
@@ -323,8 +318,6 @@ class MainActivity : ComponentActivity() {
         settingsLayout.addView(row2)
         settingsLayout.addView(videoPickContainer)
 
-
-        // --- Action Area (Weight: 3) ---
         val actionLayout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.BOTTOM
@@ -357,7 +350,6 @@ class MainActivity : ComponentActivity() {
         actionLayout.addView(btnGenerate)
         actionLayout.addView(statusCard)
 
-        // Add all to Main Layout
         mainContentLayout.addView(topBar)
         mainContentLayout.addView(headerLayout)
         mainContentLayout.addView(settingsLayout)
@@ -365,7 +357,7 @@ class MainActivity : ComponentActivity() {
 
 
         // ==========================================
-        // 2. RESULT SCREEN (Fixed Layout)
+        // 2. RESULT SCREEN
         // ==========================================
         resultLayout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -375,7 +367,6 @@ class MainActivity : ComponentActivity() {
             visibility = View.GONE
         }
 
-        // Header (Weight 1.5)
         val resultHeader = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER
@@ -390,7 +381,6 @@ class MainActivity : ComponentActivity() {
         }
         resultHeader.addView(successIcon)
 
-        // File Info Card (Weight 1.5)
         val fileInfoCard = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             background = createGradientDrawable("#151C2C", "#151C2C", 20f, 1, "#334155")
@@ -428,7 +418,6 @@ class MainActivity : ComponentActivity() {
         fileInfoCard.addView(folderIcon)
         fileInfoCard.addView(fileTextsLayout)
 
-        // Metadata Card (Weight 5.5)
         val resultMetaCard = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             background = createGradientDrawable("#151C2C", "#151C2C", 25f, 1, "#334155")
@@ -466,7 +455,6 @@ class MainActivity : ComponentActivity() {
         resultMetaCard.addView(resultPlatformTitle)
         resultMetaCard.addView(scrollMetaWrapper)
 
-        // Action Row (Weight 1.5)
         val resultActionRow = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             weightSum = 2f
@@ -512,11 +500,80 @@ class MainActivity : ComponentActivity() {
 
 
         // ==========================================
-        // ADD TO ROOT
+        // 3. SPLASH SCREEN (Loading UI) 
+        // ==========================================
+        splashLayout = RelativeLayout(this).apply {
+            layoutParams = FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT)
+            setBackgroundColor(Color.parseColor("#090E17"))
+            elevation = 100f // မျက်နှာပြင် အပေါ်ဆုံးတွင်ထားရန်
+        }
+
+        // Center Content for Splash
+        val splashCenterLayout = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER
+            layoutParams = RelativeLayout.LayoutParams(RelativeLayout.LayoutParams.WRAP_CONTENT, RelativeLayout.LayoutParams.WRAP_CONTENT).apply {
+                addRule(RelativeLayout.CENTER_IN_PARENT)
+            }
+        }
+
+        val splashTitle = TextView(this).apply {
+            text = "CREATOR STUDIO"
+            textSize = 32f
+            setTypeface(null, Typeface.BOLD)
+            setTextColor(Color.parseColor("#38BDF8")) // Light Blue Glow
+            gravity = Gravity.CENTER
+        }
+
+        val splashSubtitle = TextView(this).apply {
+            text = "AI SRT & Metadata Generator"
+            textSize = 14f
+            setTextColor(Color.parseColor("#94A3B8"))
+            gravity = Gravity.CENTER
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { topMargin = 10 }
+        }
+
+        val progressBar = ProgressBar(this).apply {
+            layoutParams = LinearLayout.LayoutParams(120, 120).apply { topMargin = 60 }
+            indeterminateTintList = ColorStateList.valueOf(Color.parseColor("#38BDF8"))
+        }
+
+        splashCenterLayout.addView(splashTitle)
+        splashCenterLayout.addView(splashSubtitle)
+        splashCenterLayout.addView(progressBar)
+
+        // Bottom Developer Text
+        val devText = TextView(this).apply {
+            text = "Developed by Dexter Syntax"
+            textSize = 13f
+            setTypeface(null, Typeface.ITALIC)
+            setTextColor(Color.parseColor("#FCD34D")) // Gold Color
+            layoutParams = RelativeLayout.LayoutParams(RelativeLayout.LayoutParams.WRAP_CONTENT, RelativeLayout.LayoutParams.WRAP_CONTENT).apply {
+                addRule(RelativeLayout.ALIGN_PARENT_BOTTOM)
+                addRule(RelativeLayout.CENTER_HORIZONTAL)
+                bottomMargin = 100
+            }
+        }
+
+        splashLayout.addView(splashCenterLayout)
+        splashLayout.addView(devText)
+
+
+        // ==========================================
+        // ADD ALL TO ROOT
         // ==========================================
         rootLayout.addView(mainContentLayout)
         rootLayout.addView(resultLayout)
+        rootLayout.addView(splashLayout) // နောက်ဆုံးမှထည့်ခြင်းဖြင့် အပေါ်ဆုံးရောက်စေသည်
         setContentView(rootLayout)
+
+        // Splash Screen Animation (Fade out after 2.5 seconds)
+        CoroutineScope(Dispatchers.Main).launch {
+            delay(2500)
+            splashLayout.animate().alpha(0f).setDuration(600).withEndAction {
+                splashLayout.visibility = View.GONE
+            }
+        }
 
         // Language Toggle Logic
         btnLang.setOnClickListener {
@@ -609,7 +666,6 @@ class MainActivity : ComponentActivity() {
                         """.trimIndent()
                     }
 
-                    // Content Moderation Prompt Active
                     val aiPrompt = """
                         STRICT INSTRUCTIONS: You are a professional subtitler. You MUST completely ignore the original language text and ONLY output the requested translations.
                         
@@ -743,7 +799,6 @@ class MainActivity : ComponentActivity() {
         }
         layout.addView(title)
 
-        // ScrollView inside Dialog to hold multiple buttons cleanly
         val scrollView = ScrollView(this).apply {
             layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
         }
@@ -751,7 +806,6 @@ class MainActivity : ComponentActivity() {
             orientation = LinearLayout.VERTICAL
         }
 
-        // App List and their Tutorials
         val tutorials = listOf(
             Pair("🎬 CapCut", "၁။ ဖုန်းထဲမှ CapCut ကို ဖွင့်ပြီး 'New Project' မှ ဗီဒီယိုကို ရွေးပါ။\n\n၂။ အောက်ခြေ Menu မှ 'Text' ကို နှိပ်ပါ။\n\n၃။ 'Subtitles' ကို နှိပ်ပြီး 'Local Subtitles' (သို့) 'Import' ကို ရွေးပါ။\n\n၄။ ဖုန်းထဲက Downloads/AutoSRT ဖိုဒါထဲရှိ .srt ဖိုင်ကို ရွေးထည့်ပါ။\n\n၅။ စာတန်းထိုးများ ပေါ်လာပါမည်။ Style တွင် စိတ်ကြိုက်ပြင်ပါ။"),
             Pair("✂️ KineMaster", "၁။ KineMaster ကိုဖွင့်ပြီး New Project ဖြင့် ဗီဒီယိုကို Timeline ထဲထည့်ပါ။\n\n၂။ ညာဘက်အဝိုင်း Menu ထဲမှ 'Layer' ကိုနှိပ်ပြီး 'Text' (သို့) 'CC (Subtitles)' ကိုရွေးပါ။\n\n၃။ Import file ရွေးချယ်စရာထဲမှ Downloads/AutoSRT အောက်ရှိ .srt ဖိုင်ကို ရွေးချယ်ထည့်သွင်းပါ။\n\n၄။ စာတန်းများ Timeline ပေါ်ရောက်လာလျှင် ဖောင့်နှင့် အရောင်ပြောင်းနိုင်ပါသည်။"),
