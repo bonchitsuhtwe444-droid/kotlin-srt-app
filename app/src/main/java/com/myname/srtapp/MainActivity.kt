@@ -1,7 +1,10 @@
 package com.myname.srtapp
 
 import android.annotation.SuppressLint
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.ContentValues
+import android.content.Context
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.ColorDrawable
@@ -43,7 +46,12 @@ class MainActivity : ComponentActivity() {
     private var selectedMode = "Normal"
     private var selectedSecLang = "English"
 
-    // UI Elements
+    // Root Views for View Switching
+    private lateinit var rootLayout: FrameLayout
+    private lateinit var mainScrollView: ScrollView
+    private lateinit var resultLayout: LinearLayout
+
+    // Main UI Elements
     private lateinit var titleText: TextView
     private lateinit var subTitleText: TextView
     private lateinit var apiKeyInput: EditText
@@ -55,9 +63,10 @@ class MainActivity : ComponentActivity() {
     private lateinit var langSpinner: Spinner
     private lateinit var videoStatusText: TextView
     
-    private lateinit var metadataCard: LinearLayout
-    private lateinit var metadataTitle: TextView
-    private lateinit var metadataInput: EditText
+    // Result UI Elements
+    private lateinit var resultPlatformTitle: TextView
+    private lateinit var resultFilePathText: TextView
+    private lateinit var resultMetadataInput: EditText
 
     private var isMyanmar = true 
 
@@ -69,8 +78,7 @@ class MainActivity : ComponentActivity() {
         "vid_ready" to mapOf(true to "✅ ဗီဒီယို အသင့်ဖြစ်ပါပြီ", false to "✅ Video Ready"),
         "vid_none" to mapOf(true to "ဗီဒီယို မရွေးရသေးပါ", false to "No video selected"),
         "gen_btn" to mapOf(true to "🚀 ဂျင်နရိတ် လုပ်မည်", false to "🚀 Generate Now"),
-        "ready" to mapOf(true to "အသင့်ဖြစ်ပါပြီ... စတင်ရန် ခလုတ်နှိပ်ပါ။", false to "Ready... Press generate to start."),
-        "meta_title" to mapOf(true to "📝 ဆိုရှယ်မီဒီယာ စာသားများ (Copy ယူနိုင်ပါသည်)", false to "📝 Social Media Metadata (Ready to copy)")
+        "ready" to mapOf(true to "အသင့်ဖြစ်ပါပြီ... စတင်ရန် ခလုတ်နှိပ်ပါ။", false to "Ready... Press generate to start.")
     )
 
     private val arrayLabels: Map<String, Map<Boolean, Array<String>>> = mapOf(
@@ -79,8 +87,8 @@ class MainActivity : ComponentActivity() {
             false to arrayOf("🎬 Standard", "💬 Informal", "🔥 Action", "😂 Comedy")
         ),
         "platforms" to mapOf(
-            true to arrayOf("▶️ YouTube အတွက်", "🎵 TikTok အတွက်", "📘 Facebook အတွက်"),
-            false to arrayOf("▶️ For YouTube", "🎵 For TikTok", "📘 For Facebook")
+            true to arrayOf("▶️ YouTube", "🎵 TikTok", "📘 Facebook"),
+            false to arrayOf("▶️ YouTube", "🎵 TikTok", "📘 Facebook")
         ),
         "modes" to mapOf(
             true to arrayOf("📄 Normal Mode (မြန်မာသီးသန့်)", "📑 Dual Subtitles (၂ မျိုးတွဲ)"),
@@ -105,16 +113,24 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        val scrollView = ScrollView(this).apply {
+        // Root FrameLayout to hold both Main and Result screens
+        rootLayout = FrameLayout(this).apply {
             layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
-            isFillViewport = true
             setBackgroundColor(Color.parseColor("#0F172A")) 
+        }
+
+        // ==========================================
+        // 1. MAIN SCREEN (ScrollView)
+        // ==========================================
+        mainScrollView = ScrollView(this).apply {
+            layoutParams = FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT)
+            isFillViewport = true
         }
 
         val mainLayout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
-            setPadding(50, 70, 50, 70)
+            setPadding(50, 60, 50, 70)
         }
 
         val topBar = LinearLayout(this).apply {
@@ -126,11 +142,12 @@ class MainActivity : ComponentActivity() {
         val topSpacer = View(this).apply { layoutParams = LinearLayout.LayoutParams(0, 1, 1f) }
         
         val btnSettings = Button(this).apply {
-            text = "⚙️"
+            text = "⚙️ Settings"
+            isAllCaps = false
             setTextColor(Color.WHITE)
-            textSize = 14f
+            textSize = 12f
             background = createGradientDrawable("#1E293B", "#1E293B", 20f, 2, "#475569")
-            setPadding(20, 10, 20, 10)
+            setPadding(30, 10, 30, 10)
             layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, 110).apply { marginEnd = 20 }
             setOnClickListener { showSettingsDialog() }
         }
@@ -208,13 +225,7 @@ class MainActivity : ComponentActivity() {
         
         langSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
             override fun onItemSelected(p0: AdapterView<*>?, p1: View?, pos: Int, p3: Long) {
-                selectedSecLang = when(pos) { 
-                    1 -> "Chinese"
-                    2 -> "Korean"
-                    3 -> "Japanese"
-                    4 -> "Thai"
-                    else -> "English"
-                }
+                selectedSecLang = when(pos) { 1 -> "Chinese"; 2 -> "Korean"; 3 -> "Japanese"; 4 -> "Thai"; else -> "English" }
             }
             override fun onNothingSelected(p0: AdapterView<*>?) {}
         }
@@ -304,38 +315,169 @@ class MainActivity : ComponentActivity() {
         }
         statusCard.addView(statusText)
 
-        metadataCard = LinearLayout(this).apply {
+        mainLayout.addView(topBar)
+        mainLayout.addView(titleText)
+        mainLayout.addView(subTitleText)
+        mainLayout.addView(settingsCard)
+        mainLayout.addView(videoCard)
+        mainLayout.addView(btnGenerate)
+        mainLayout.addView(statusCard)
+
+        mainScrollView.addView(mainLayout)
+
+
+        // ==========================================
+        // 2. RESULT SCREEN (Hidden by default)
+        // ==========================================
+        resultLayout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            background = createGradientDrawable("#1E293B", "#1E293B", 30f, 0, "")
-            setPadding(40, 50, 40, 50)
-            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { bottomMargin = 40 }
-            elevation = 10f
+            layoutParams = FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT)
+            setPadding(50, 70, 50, 70)
             visibility = View.GONE
         }
 
-        metadataTitle = TextView(this).apply {
-            text = textLabels["meta_title"]!![isMyanmar]
-            setTextColor(Color.parseColor("#38BDF8"))
-            textSize = 15f
+        val successIcon = TextView(this).apply {
+            text = "🎉\nအောင်မြင်ပါသည်!"
+            textSize = 24f
             setTypeface(null, Typeface.BOLD)
-            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { bottomMargin = 20 }
+            setTextColor(Color.parseColor("#4ADE80"))
+            gravity = Gravity.CENTER
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { bottomMargin = 40 }
         }
 
-        metadataInput = EditText(this).apply {
-            setTextColor(Color.WHITE)
-            textSize = 14f
-            background = createGradientDrawable("#0F172A", "#0F172A", 20f, 2, "#334155")
+        // File Path Info Card
+        val fileInfoCard = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            background = createGradientDrawable("#1E293B", "#1E293B", 25f, 2, "#334155")
             setPadding(40, 40, 40, 40)
-            minLines = 8
+            gravity = Gravity.CENTER_VERTICAL
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { bottomMargin = 40 }
+        }
+        
+        val folderIcon = TextView(this).apply {
+            text = "📁"
+            textSize = 24f
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { marginEnd = 30 }
+        }
+        
+        val fileTextsLayout = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+        }
+        
+        val saveLocTitle = TextView(this).apply {
+            text = "SRT ဖိုင်ကို အောက်ပါနေရာတွင် သိမ်းဆည်းထားပါသည်:"
+            setTextColor(Color.parseColor("#94A3B8"))
+            textSize = 12f
+        }
+        
+        resultFilePathText = TextView(this).apply {
+            text = "Downloads/AutoSRT/AutoSRT_..."
+            setTextColor(Color.parseColor("#38BDF8"))
+            textSize = 14f
+            setTypeface(null, Typeface.BOLD)
+        }
+        
+        fileTextsLayout.addView(saveLocTitle)
+        fileTextsLayout.addView(resultFilePathText)
+        fileInfoCard.addView(folderIcon)
+        fileInfoCard.addView(fileTextsLayout)
+
+        // Metadata Card
+        val resultMetaCard = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            background = createGradientDrawable("#1E293B", "#1E293B", 30f, 0, "")
+            setPadding(40, 50, 40, 50)
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f).apply { bottomMargin = 40 }
+            elevation = 10f
+        }
+
+        resultPlatformTitle = TextView(this).apply {
+            text = "▶️ YouTube Metadata"
+            setTextColor(Color.WHITE)
+            textSize = 16f
+            setTypeface(null, Typeface.BOLD)
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { bottomMargin = 30 }
+        }
+
+        // Scrollable EditText inside the card
+        val scrollMetaWrapper = ScrollView(this).apply {
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.MATCH_PARENT)
+            isFillViewport = true
+        }
+
+        resultMetadataInput = EditText(this).apply {
+            setTextColor(Color.parseColor("#E2E8F0"))
+            textSize = 14f
+            background = null
             gravity = Gravity.TOP or Gravity.START
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE
             isSingleLine = false
+            layoutParams = FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT)
+            // Make it selectable but disable keyboard popup
+            isFocusable = true
+            isFocusableInTouchMode = true
+            keyListener = null 
+        }
+        
+        scrollMetaWrapper.addView(resultMetadataInput)
+        resultMetaCard.addView(resultPlatformTitle)
+        resultMetaCard.addView(scrollMetaWrapper)
+
+        // Result Action Buttons
+        val resultActionRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            weightSum = 2f
             layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
         }
 
-        metadataCard.addView(metadataTitle)
-        metadataCard.addView(metadataInput)
+        val btnBack = Button(this).apply {
+            text = "🔙 ပြန်ထွက်မည်"
+            isAllCaps = false; setTextColor(Color.WHITE); textSize = 14f
+            background = createGradientDrawable("#334155", "#475569", 25f, 0, "")
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply { marginEnd = 15 }
+            setPadding(0, 40, 0, 40)
+            setOnClickListener { 
+                resultLayout.visibility = View.GONE
+                mainScrollView.visibility = View.VISIBLE
+                statusText.text = textLabels["ready"]!![isMyanmar]
+                statusText.setTextColor(Color.parseColor("#94A3B8"))
+                btnGenerate.isEnabled = true
+                btnGenerate.alpha = 1.0f
+            }
+        }
 
+        val btnCopy = Button(this).apply {
+            text = "📋 Copy All"
+            isAllCaps = false; setTextColor(Color.WHITE); textSize = 14f; setTypeface(null, Typeface.BOLD)
+            background = createGradientDrawable("#10B981", "#059669", 25f, 0, "")
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply { marginStart = 15 }
+            setPadding(0, 40, 0, 40)
+            setOnClickListener {
+                val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                val clip = ClipData.newPlainText("Metadata", resultMetadataInput.text.toString())
+                clipboard.setPrimaryClip(clip)
+                Toast.makeText(this@MainActivity, "စာသားများ Copy ကူးယူပြီးပါပြီ!", Toast.LENGTH_SHORT).show()
+            }
+        }
+
+        resultActionRow.addView(btnBack)
+        resultActionRow.addView(btnCopy)
+
+        resultLayout.addView(successIcon)
+        resultLayout.addView(fileInfoCard)
+        resultLayout.addView(resultMetaCard)
+        resultLayout.addView(resultActionRow)
+
+
+        // ==========================================
+        // ADD TO ROOT
+        // ==========================================
+        rootLayout.addView(mainScrollView)
+        rootLayout.addView(resultLayout)
+        setContentView(rootLayout)
+
+        // Language Toggle Logic
         btnLang.setOnClickListener {
             isMyanmar = !isMyanmar
             btnLang.text = if (isMyanmar) "🌐 ENG" else "🌐 မြန်မာ"
@@ -344,7 +486,6 @@ class MainActivity : ComponentActivity() {
             apiKeyInput.hint = textLabels["api_hint"]!![isMyanmar]
             btnPickVideo.text = textLabels["pick_vid"]!![isMyanmar]
             btnGenerate.text = textLabels["gen_btn"]!![isMyanmar]
-            metadataTitle.text = textLabels["meta_title"]!![isMyanmar]
             
             if (selectedVideoUri == null) {
                 videoStatusText.text = textLabels["vid_none"]!![isMyanmar]
@@ -361,6 +502,7 @@ class MainActivity : ComponentActivity() {
             setSpinnerAdapter(langSpinner, arrayLabels["sec_langs"]!![isMyanmar]!!)
         }
 
+        // Main AI Generation Logic
         btnGenerate.setOnClickListener {
             val apiKey = apiKeyInput.text.toString().trim()
             if (apiKey.isEmpty() || selectedVideoUri == null) {
@@ -370,8 +512,6 @@ class MainActivity : ComponentActivity() {
             }
 
             btnGenerate.isEnabled = false; btnGenerate.alpha = 0.5f
-            metadataCard.visibility = View.GONE
-            metadataInput.setText("")
 
             CoroutineScope(Dispatchers.IO).launch {
                 try {
@@ -405,7 +545,6 @@ class MainActivity : ComponentActivity() {
                         
                     val jsonMediaType = "application/json; charset=utf-8".toMediaTypeOrNull()
                     
-                    // --- AI ကို CapCut တွင် အတိအကျဖတ်နိုင်သော SRT ဖိုင်ပုံစံ ထုတ်ပေးရန် Prompt ---
                     val srtTaskInstruction = if (selectedMode == "Dual") {
                         """
                         For EVERY subtitle block, provide EXACTLY TWO lines of text:
@@ -424,7 +563,6 @@ class MainActivity : ComponentActivity() {
                         CRITICAL SRT FORMATTING FOR CAPCUT:
                         - Format must be standard SubRip (.srt).
                         - No extra empty lines within a single subtitle block.
-                        - Provide the translation in a single continuous line or max 2 lines. Do NOT break the Burmese text into many short lines.
                         - Output ONLY in Myanmar script.
                         - Use standard time format: 00:00:00,000 --> 00:00:00,000
                         """.trimIndent()
@@ -487,54 +625,55 @@ class MainActivity : ComponentActivity() {
                                 srtContent = extractedText.replace("```srt", "").replace("```", "").trim()
                             }
 
-                            // Clean up excessive blank lines to ensure CapCut compatibility
                             srtContent = srtContent.replace(Regex("\n{3,}"), "\n\n")
 
                             val timestamp = System.currentTimeMillis()
-                            val srtSaved = autoSaveFile("AutoSRT_$timestamp.srt", "application/x-subrip", srtContent)
+                            val fileName = "AutoSRT_$timestamp.srt"
+                            val srtSaved = autoSaveFile(fileName, "application/x-subrip", srtContent)
 
                             withContext(Dispatchers.Main) {
                                 if (srtSaved) {
-                                    statusText.text = if (isMyanmar) "🎉 အောင်မြင်ပါသည်!\nSRT အား Downloads/AutoSRT တွင် သိမ်းဆည်းပြီးပါပြီ။" else "🎉 Success!\nSaved SRT to Downloads/AutoSRT."
-                                    statusText.setTextColor(Color.parseColor("#4ADE80"))
+                                    // Switch to Result Screen
+                                    mainScrollView.visibility = View.GONE
+                                    resultLayout.visibility = View.VISIBLE
                                     
-                                    if (metaContent.isNotEmpty()) {
-                                        metadataCard.visibility = View.VISIBLE
-                                        metadataInput.setText(metaContent)
-                                        scrollView.post { scrollView.fullScroll(View.FOCUS_DOWN) }
+                                    val pfIcon = when (selectedPlatform) {
+                                        "YouTube" -> "▶️ YouTube"
+                                        "TikTok" -> "🎵 TikTok"
+                                        else -> "📘 Facebook"
                                     }
+                                    resultPlatformTitle.text = "$pfIcon Metadata"
+                                    resultMetadataInput.setText(metaContent)
+                                    resultFilePathText.text = "Downloads/AutoSRT/$fileName"
                                 } else {
                                     statusText.text = if (isMyanmar) "⚠️ ဖုန်းထဲသိမ်း၍မရပါ။ Storage Permission လိုအပ်ပါသည်။" else "⚠️ Save Failed. Storage Permission required."
                                     statusText.setTextColor(Color.parseColor("#F59E0B"))
+                                    btnGenerate.isEnabled = true
+                                    btnGenerate.alpha = 1.0f
                                 }
                             }
                         } catch (e: Exception) {
-                            withContext(Dispatchers.Main) { statusText.text = "❌ Gemini Parsing Error"; statusText.setTextColor(Color.parseColor("#F87171")) }
+                            withContext(Dispatchers.Main) { 
+                                statusText.text = "❌ Gemini Parsing Error"; statusText.setTextColor(Color.parseColor("#F87171"))
+                                btnGenerate.isEnabled = true; btnGenerate.alpha = 1.0f 
+                            }
                         }
                     } else {
                         val errMsg = try { JSONObject(responseStr ?: "").getJSONObject("error").getString("message") } catch(e:Exception){ "HTTP ${response.code}" }
-                        withContext(Dispatchers.Main) { statusText.text = "❌ API Error: $errMsg"; statusText.setTextColor(Color.parseColor("#F87171")) }
+                        withContext(Dispatchers.Main) { 
+                            statusText.text = "❌ API Error: $errMsg"; statusText.setTextColor(Color.parseColor("#F87171"))
+                            btnGenerate.isEnabled = true; btnGenerate.alpha = 1.0f 
+                        }
                     }
                     audioFile.delete()
                 } catch (e: Exception) {
-                    withContext(Dispatchers.Main) { statusText.text = "❌ Error: ${e.message}"; statusText.setTextColor(Color.parseColor("#F87171")) }
-                } finally {
-                    withContext(Dispatchers.Main) { btnGenerate.isEnabled = true; btnGenerate.alpha = 1.0f }
+                    withContext(Dispatchers.Main) { 
+                        statusText.text = "❌ Error: ${e.message}"; statusText.setTextColor(Color.parseColor("#F87171"))
+                        btnGenerate.isEnabled = true; btnGenerate.alpha = 1.0f 
+                    }
                 }
             }
         }
-
-        mainLayout.addView(topBar)
-        mainLayout.addView(titleText)
-        mainLayout.addView(subTitleText)
-        mainLayout.addView(settingsCard)
-        mainLayout.addView(videoCard)
-        mainLayout.addView(btnGenerate)
-        mainLayout.addView(statusCard)
-        mainLayout.addView(metadataCard)
-
-        scrollView.addView(mainLayout)
-        setContentView(scrollView)
     }
 
     private fun showSettingsDialog() {
@@ -546,7 +685,7 @@ class MainActivity : ComponentActivity() {
         }
         
         val title = TextView(this).apply {
-            text = "⚙️ Settings"
+            text = "⚙️ Settings & Help"
             textSize = 22f
             setTypeface(null, Typeface.BOLD)
             setTextColor(Color.WHITE)
