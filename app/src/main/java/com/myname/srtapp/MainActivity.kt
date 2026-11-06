@@ -47,12 +47,13 @@ class MainActivity : ComponentActivity() {
     private var selectedPlatform = "YouTube"
     private var selectedMode = "Normal"
     private var selectedSecLang = "English"
+    private var isSmartSyncEnabled = true // Smart Sync Feature
 
-    // Root Views for View Switching
+    // Root Views
     private lateinit var rootLayout: FrameLayout
     private lateinit var mainContentLayout: LinearLayout
     private lateinit var resultLayout: LinearLayout
-    private lateinit var splashLayout: RelativeLayout // Loading မျက်နှာပြင်အတွက်
+    private lateinit var splashLayout: RelativeLayout 
 
     // Main UI Elements
     private lateinit var titleText: TextView
@@ -64,6 +65,7 @@ class MainActivity : ComponentActivity() {
     private lateinit var platformSpinner: Spinner
     private lateinit var modeSpinner: Spinner
     private lateinit var langSpinner: Spinner
+    private lateinit var smartSyncSwitch: Switch // New Sync Switch
     private lateinit var videoStatusText: TextView
 
     // Result UI Elements
@@ -81,13 +83,14 @@ class MainActivity : ComponentActivity() {
         "vid_ready" to mapOf(true to "✅ ဗီဒီယို အသင့်ဖြစ်ပါပြီ", false to "✅ Video Ready"),
         "vid_none" to mapOf(true to "ဗီဒီယို မရွေးရသေးပါ", false to "No video selected"),
         "gen_btn" to mapOf(true to "🚀 ဂျင်နရိတ် လုပ်မည်", false to "🚀 Generate Now"),
-        "ready" to mapOf(true to "အသင့်ဖြစ်ပါပြီ... စတင်ရန် ခလုတ်နှိပ်ပါ။", false to "Ready... Press generate to start.")
+        "ready" to mapOf(true to "အသင့်ဖြစ်ပါပြီ... စတင်ရန် ခလုတ်နှိပ်ပါ။", false to "Ready... Press generate to start."),
+        "smart_sync" to mapOf(true to "⚡ Smart Timeline Sync (အချိန်တိကျစွာ ညှိမည်)", false to "⚡ Smart Timeline Sync")
     )
 
     private val arrayLabels: Map<String, Map<Boolean, Array<String>>> = mapOf(
         "styles" to mapOf(
-            true to arrayOf("🎬 ပုံမှန်", "💬 အလွတ်သဘော", "🔥 အက်ရှင်", "😂 ဟာသ"),
-            false to arrayOf("🎬 Standard", "💬 Informal", "🔥 Action", "😂 Comedy")
+            true to arrayOf("🎬 ပုံမှန်", "👔 တရားဝင် (Formal)", "😎 လူငယ်သုံး (Gen Z)", "🔥 ဒရာမာ", "😂 ဟာသ"),
+            false to arrayOf("🎬 Standard", "👔 Formal", "😎 Gen Z", "🔥 Dramatic", "😂 Comedy")
         ),
         "platforms" to mapOf(
             true to arrayOf("▶️ YouTube", "🎵 TikTok", "📘 Facebook"),
@@ -211,12 +214,23 @@ class MainActivity : ComponentActivity() {
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
             background = createGradientDrawable("#151C2C", "#151C2C", 20f, 1, "#334155")
             setPadding(40, 0, 40, 0)
-            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f).apply { bottomMargin = 20 }
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f).apply { bottomMargin = 15 }
+        }
+
+        // --- NEW: Smart Sync Switch ---
+        smartSyncSwitch = Switch(this).apply {
+            text = textLabels["smart_sync"]!![isMyanmar]
+            setTextColor(Color.parseColor("#38BDF8")) // Highlight Blue
+            textSize = 13f
+            isChecked = true // Default ON
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { bottomMargin = 15 }
+            setPadding(10, 0, 10, 0)
+            setOnCheckedChangeListener { _, isChecked -> isSmartSyncEnabled = isChecked }
         }
 
         val row1 = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
-            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f).apply { bottomMargin = 20 }
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f).apply { bottomMargin = 15 }
             weightSum = 2f
         }
 
@@ -255,7 +269,7 @@ class MainActivity : ComponentActivity() {
 
         val row2 = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
-            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f).apply { bottomMargin = 20 }
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f).apply { bottomMargin = 15 }
             weightSum = 2f
         }
 
@@ -267,7 +281,13 @@ class MainActivity : ComponentActivity() {
         setSpinnerAdapter(styleSpinner, arrayLabels["styles"]!![isMyanmar]!!)
         styleSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
             override fun onItemSelected(p0: AdapterView<*>?, p1: View?, pos: Int, p3: Long) {
-                selectedStyle = when(pos) { 1 -> "Informal"; 2 -> "Action"; 3 -> "Comedy"; else -> "Standard professional" }
+                selectedStyle = when(pos) { 
+                    1 -> "Formal"
+                    2 -> "Gen Z" 
+                    3 -> "Dramatic" 
+                    4 -> "Comedy" 
+                    else -> "Standard" 
+                }
             }
             override fun onNothingSelected(p0: AdapterView<*>?) {}
         }
@@ -314,6 +334,7 @@ class MainActivity : ComponentActivity() {
         videoPickContainer.addView(videoStatusText)
 
         settingsLayout.addView(apiKeyInput)
+        settingsLayout.addView(smartSyncSwitch) // Added Switch
         settingsLayout.addView(row1)
         settingsLayout.addView(row2)
         settingsLayout.addView(videoPickContainer)
@@ -505,10 +526,9 @@ class MainActivity : ComponentActivity() {
         splashLayout = RelativeLayout(this).apply {
             layoutParams = FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT)
             setBackgroundColor(Color.parseColor("#090E17"))
-            elevation = 100f // မျက်နှာပြင် အပေါ်ဆုံးတွင်ထားရန်
+            elevation = 100f 
         }
 
-        // Center Content for Splash
         val splashCenterLayout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER
@@ -521,7 +541,7 @@ class MainActivity : ComponentActivity() {
             text = "CREATOR STUDIO"
             textSize = 32f
             setTypeface(null, Typeface.BOLD)
-            setTextColor(Color.parseColor("#38BDF8")) // Light Blue Glow
+            setTextColor(Color.parseColor("#38BDF8")) 
             gravity = Gravity.CENTER
         }
 
@@ -542,12 +562,11 @@ class MainActivity : ComponentActivity() {
         splashCenterLayout.addView(splashSubtitle)
         splashCenterLayout.addView(progressBar)
 
-        // Bottom Developer Text
         val devText = TextView(this).apply {
             text = "Developed by Dexter Syntax"
             textSize = 13f
             setTypeface(null, Typeface.ITALIC)
-            setTextColor(Color.parseColor("#FCD34D")) // Gold Color
+            setTextColor(Color.parseColor("#FCD34D")) 
             layoutParams = RelativeLayout.LayoutParams(RelativeLayout.LayoutParams.WRAP_CONTENT, RelativeLayout.LayoutParams.WRAP_CONTENT).apply {
                 addRule(RelativeLayout.ALIGN_PARENT_BOTTOM)
                 addRule(RelativeLayout.CENTER_HORIZONTAL)
@@ -564,7 +583,7 @@ class MainActivity : ComponentActivity() {
         // ==========================================
         rootLayout.addView(mainContentLayout)
         rootLayout.addView(resultLayout)
-        rootLayout.addView(splashLayout) // နောက်ဆုံးမှထည့်ခြင်းဖြင့် အပေါ်ဆုံးရောက်စေသည်
+        rootLayout.addView(splashLayout) 
         setContentView(rootLayout)
 
         // Splash Screen Animation (Fade out after 2.5 seconds)
@@ -584,6 +603,7 @@ class MainActivity : ComponentActivity() {
             apiKeyInput.hint = textLabels["api_hint"]!![isMyanmar]
             btnPickVideo.text = textLabels["pick_vid"]!![isMyanmar]
             btnGenerate.text = textLabels["gen_btn"]!![isMyanmar]
+            smartSyncSwitch.text = textLabels["smart_sync"]!![isMyanmar]
 
             if (selectedVideoUri == null) {
                 videoStatusText.text = textLabels["vid_none"]!![isMyanmar]
@@ -643,26 +663,42 @@ class MainActivity : ComponentActivity() {
 
                     val jsonMediaType = "application/json; charset=utf-8".toMediaTypeOrNull()
 
+                    // Feature 2: Style Transfer Prompt Generation
+                    val styleInstruction = when(selectedStyle) {
+                        "Formal" -> "Use a highly formal, polite, and respectful tone (e.g., using 'ကျွန်တော်', 'ရှင်')."
+                        "Gen Z" -> "Use modern Myanmar Gen Z slang, energetic youth phrases, and casual conversational tone."
+                        "Dramatic" -> "Use a highly dramatic, emotional, and intense tone suitable for movies."
+                        "Comedy" -> "Use a funny, humorous, and entertaining tone."
+                        else -> "Use a standard, clear, and professional tone."
+                    }
+
+                    // Feature 1: Smart Sync Instruction
+                    val syncInstruction = if (isSmartSyncEnabled) {
+                        "- SMART TIMELINE SYNC: Ensure absolutely precise timestamps matching the audio. No overlapping times. Leave a 10ms gap between consecutive subtitles."
+                    } else {
+                        "- Use standard time format: 00:00:00,000 --> 00:00:00,000"
+                    }
+
                     val srtTaskInstruction = if (selectedMode == "Dual") {
                         """
                         For EVERY subtitle block, provide EXACTLY TWO lines of text:
                         Line 1: Translated directly into $selectedSecLang language.
-                        Line 2: Translated directly into Myanmar (Burmese) language using a $selectedStyle tone.
+                        Line 2: Translated directly into Myanmar (Burmese) language.
                         CRITICAL SRT FORMATTING FOR CAPCUT:
                         - Format must be standard SubRip (.srt).
                         - No extra empty lines within a single subtitle block.
                         - Just ONE line break between Line 1 and Line 2.
                         - Do NOT add multiple line breaks inside Burmese text.
-                        - Use standard time format: 00:00:00,000 --> 00:00:00,000
+                        $syncInstruction
                         """.trimIndent()
                     } else {
                         """
-                        For EVERY subtitle block, translate the spoken words directly into Myanmar (Burmese) language using a $selectedStyle tone.
+                        For EVERY subtitle block, translate the spoken words directly into Myanmar (Burmese) language.
                         CRITICAL SRT FORMATTING FOR CAPCUT:
                         - Format must be standard SubRip (.srt).
                         - No extra empty lines within a single subtitle block.
                         - Output ONLY in Myanmar script.
-                        - Use standard time format: 00:00:00,000 --> 00:00:00,000
+                        $syncInstruction
                         """.trimIndent()
                     }
 
@@ -672,7 +708,9 @@ class MainActivity : ComponentActivity() {
                         CRITICAL CONTENT MODERATION (YELLOW DOLLAR PROTECTION):
                         - You MUST aggressively sanitize all Burmese translations and metadata.
                         - Replace violent, adult, or sensitive words (e.g., သတ်တယ်, သွေးထွက်တယ်, မုဒိမ်းကျင့်တယ်, သေတယ်) with monetization-friendly, safe alternatives (e.g., ရှင်းလင်းတယ်, ထိခိုက်သွားတယ်, အနိုင်ကျင့်ခံရတယ်, ဆုံးပါးသွားတယ်).
-                        - Ensure 100% compliance with YouTube/TikTok advertiser-friendly guidelines.
+                        
+                        STYLE TRANSFER:
+                        - $styleInstruction
                         
                         Task 1: Generate a perfectly timed SRT file from the audio.
                         $srtTaskInstruction
@@ -778,9 +816,6 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    // ==========================================
-    // SETTINGS & TUTORIAL DIALOGS (5 APPS)
-    // ==========================================
     private fun showSettingsDialog() {
         val builder = android.app.AlertDialog.Builder(this)
         val layout = LinearLayout(this).apply {
@@ -883,9 +918,6 @@ class MainActivity : ComponentActivity() {
         dialog.show()
     }
 
-    // ==========================================
-    // UTILITY FUNCTIONS
-    // ==========================================
     private fun createGradientDrawable(startColor: String, endColor: String, radius: Float, strokeWidth: Int, strokeColor: String): GradientDrawable {
         val drawable = GradientDrawable(GradientDrawable.Orientation.TL_BR, intArrayOf(Color.parseColor(startColor), Color.parseColor(endColor)))
         drawable.cornerRadius = radius
